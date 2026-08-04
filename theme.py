@@ -150,15 +150,26 @@ html, body { height: 100%; }
 /* Column 3 has no growing box, so its Submit would float above the other two columns' last row. Push it down. */
 .neo-controls > .column > button:last-child { margin-top: auto; }
 /* Vertical sizes track the window height, so a large window fits the whole app on one screen while a short one
-   keeps every box usable and scrolls instead. */
-/* Sized so the three control columns come out roughly level: column 3 ends at its Submit button, and the upload
-   and query boxes are what would otherwise run past it. */
+   keeps every box usable and scrolls instead. The upload and query boxes are sized so the three control columns
+   come out roughly level with column 3, which ends at its Submit button. */
 .neo-upload { min-height: clamp(110px, 13dvh, 180px); }   /* also its constant height when a file is dropped */
 .neo-query textarea { min-height: clamp(64px, 7.5dvh, 130px); height: 100%; }
-/* The gallery and the answer share one height, so the results row is as short as the taller of the two. */
-.neo-gallery { height: clamp(150px, 19dvh, 300px); }
-#neo-answer { max-height: clamp(150px, 19dvh, 300px); }
-.neo-answer textarea { height: clamp(140px, 17dvh, 270px); }
+
+/* The pages and the answer take whatever height the window has left. Everything above them measures 712px at this
+   width, so subtracting that fills the screen exactly, and the floor keeps both usable on a short window where the
+   container scrolls instead. A definite height matters here: sized by flex-grow, the gallery's grid escapes its
+   column and lands on top of the answer. The answer sits under a 40px tab bar, so it gets 40px less than the
+   gallery and the two columns still end level. */
+.neo-gallery { height: clamp(150px, calc(100dvh - 712px), 700px); }
+#neo-answer,
+.neo-answer textarea { height: clamp(110px, calc(100dvh - 752px), 660px); }
+#neo-answer { overflow-y: auto; }
+/* Past 1600px the "How it works" paragraph wraps to two lines instead of three, freeing 22px. */
+@media (min-width: 1600px) {
+  .neo-gallery { height: clamp(150px, calc(100dvh - 690px), 700px); }
+  #neo-answer,
+  .neo-answer textarea { height: clamp(110px, calc(100dvh - 730px), 660px); }
+}
 /* One line of example buttons rather than three wrapped ones, and one line of scoring options. */
 .neo-examples { flex-wrap: nowrap; gap: 6px; }
 /* min-width lets the three buttons share the column instead of overflowing it, since nowrap otherwise pins each
@@ -173,7 +184,6 @@ html, body { height: 100%; }
   text-overflow: ellipsis;
 }
 .neo-step h2 + * { margin-top: 0; }
-#neo-answer { overflow-y: auto; }
 /* The "optional …" hint sits tight under the section 3 heading rather than floating. */
 .neo-hint { color: var(--neo-ink-mid); font-size: 0.9rem; font-style: italic; margin: -2px 0 10px; }
 
