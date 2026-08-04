@@ -188,8 +188,8 @@ _BIBTEX = """@software{neomme2026,
 }"""
 
 _NO_KEY_NOTE = (
-    "*Retrieval only — the ranked pages are shown at left. This provider needs a key; switch back to the "
-    "Local VLM, or paste one under **Generate an answer**.*"
+    "*The ranked pages are on the left. This provider needs a key, so either switch back to the Local VLM "
+    "or paste a key under **Generate an answer**.*"
 )
 
 
@@ -234,15 +234,15 @@ _HERO = f"""
 """
 
 _ABOUT = """
-NeoMME encodes each page as a grid of token vectors and scores a query against them with MaxSim
-(the ColBERT-style late-interaction objective), so retrieval works directly on the *rendered* page,
-no OCR step. The retrieved pages are then fed to a vision-language model, which defaults to a small one
-running on this Space. Re-index whenever you change documents.
+NeoMME encodes each page as a grid of token vectors and scores a query against them with MaxSim, the
+ColBERT-style late-interaction objective. Retrieval reads the *rendered* page, so there is no OCR step.
+The retrieved pages are then fed to a vision-language model, which defaults to a small one running on
+this Space. Index again whenever you change documents.
 """
 
 
 def _demo():
-    with gr.Blocks(title="NeoMME · document retrieval") as demo:  # theme/css passed at launch (Gradio 6)
+    with gr.Blocks(title="NeoMME document retrieval") as demo:  # theme/css passed at launch (Gradio 6)
         gr.HTML(_HERO)
         gr.Markdown(f"### How it works\n\n{_ABOUT}", elem_classes="neo-about")
 
@@ -250,7 +250,7 @@ def _demo():
         # the uploader, Submit under the provider controls. min_width => clean wrap on a narrow viewport.
         with gr.Row(equal_height=True, elem_classes="neo-controls"):
             with gr.Column(scale=2, min_width=220):
-                gr.Markdown("## 1 · Upload", elem_classes="neo-step")
+                gr.Markdown("## 1. Upload", elem_classes="neo-step")
                 files = gr.File(
                     file_count="multiple",
                     file_types=[".pdf", "image"],
@@ -259,7 +259,7 @@ def _demo():
                     elem_classes="neo-upload",
                 )
                 gr.Markdown(
-                    "*no PDF to hand? add a sample, then index it*",
+                    "*No PDF? Add the sample, then index it.*",
                     elem_classes="neo-hint",
                     visible=os.path.isfile(_SAMPLE_PDF),
                 )
@@ -272,11 +272,11 @@ def _demo():
                 build_btn = gr.Button("Index documents", variant="primary", size="sm")
                 status = gr.Markdown("*No documents indexed yet.*", elem_classes="neo-status")
             with gr.Column(scale=3, min_width=240):
-                gr.Markdown("## 2 · Ask", elem_classes="neo-step")
+                gr.Markdown("## 2. Ask", elem_classes="neo-step")
                 query = gr.Textbox(
                     label="Query", placeholder="What does the report say about …?", lines=4, elem_classes="neo-query"
                 )
-                gr.Markdown("*example queries — click one to fill the box above*", elem_classes="neo-hint")
+                gr.Markdown("*Click an example to fill the query box.*", elem_classes="neo-hint")
                 with gr.Row(elem_classes="neo-examples"):
                     for label, example in _EXAMPLE_QUERIES:
                         # default argument, or every button would close over the last loop value
@@ -285,9 +285,9 @@ def _demo():
                     top_k = gr.Slider(1, 10, value=3, step=1, label="Pages to retrieve")
                     scoring = gr.Radio(list(_SCORINGS), value=_MAXSIM, label="Scoring")
             with gr.Column(scale=3, min_width=240):
-                gr.Markdown("## 3 · Generate an answer", elem_classes="neo-step")
+                gr.Markdown("## 3. Generate an answer", elem_classes="neo-step")
                 gr.Markdown(
-                    "*the default model runs on this Space, no key needed*",
+                    "*The default model runs on this Space, so no key is needed.*",
                     elem_classes="neo-hint",
                 )
                 provider = gr.Dropdown(choices=list(PROVIDERS), value=LOCAL_PROVIDER, label="Provider")
@@ -308,11 +308,11 @@ def _demo():
 
         with gr.Row(equal_height=False):
             with gr.Column(scale=3, min_width=320):
-                gr.Markdown("## 4 · Retrieved pages", elem_classes="neo-step")
+                gr.Markdown("## 4. Retrieved pages", elem_classes="neo-step")
                 # Height comes from the CSS, which scales it with the window instead of pinning it.
                 gallery = gr.Gallery(label="Ranked pages", columns=3, object_fit="contain", elem_classes="neo-gallery")
             with gr.Column(scale=2, min_width=280):
-                gr.Markdown("## 5 · Answer", elem_classes="neo-step")
+                gr.Markdown("## 5. Answer", elem_classes="neo-step")
                 with gr.Tabs():  # markdown-rendered by default; raw for copy/inspection
                     with gr.Tab("Rendered"):
                         answer_md = gr.Markdown(elem_id="neo-answer")

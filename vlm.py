@@ -65,7 +65,7 @@ def generate_answer(provider: str, api_key: str, model: str, query: str, pages: 
     if PROVIDERS[provider].needs_key and not api_key.strip():
         raise ValueError("Enter an API key for the selected provider to generate an answer.")
     if not pages:
-        raise ValueError("No pages retrieved — build the index and search first.")
+        raise ValueError("No pages retrieved. Index your documents, then search.")
     model = model.strip() or PROVIDERS[provider].default_model
     prompt = _build_prompt(query, [label for label, _ in pages])
     images = [image for _, image in pages]

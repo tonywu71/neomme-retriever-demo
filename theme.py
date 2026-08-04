@@ -99,7 +99,7 @@ body, .gradio-container { background: var(--neo-bg); color: var(--neo-ink); }
    or the bottom of a tall page becomes unreachable. */
 html, body { height: 100%; }
 .gradio-container { max-height: 100dvh; overflow-y: auto; }
-.contain > .column { gap: 10px; }   /* Gradio's 16px between sections is more than this page needs */
+.contain > .column { gap: 10px; padding-bottom: 22px; }   /* 16px between sections is more than this page needs */
 
 /* Editorial headings for the Markdown blocks (title + numbered steps). */
 .gradio-container h1, .gradio-container h2, .gradio-container h3 {
@@ -147,8 +147,6 @@ html, body { height: 100%; }
 .neo-controls > .column > button { flex-grow: 0 !important; }   /* a Button is a bare <button>, not a .block */
 .neo-controls > .column > .neo-upload,
 .neo-controls > .column > .neo-query { flex-grow: 1 !important; }
-/* Column 3 has no growing box, so its Submit would float above the other two columns' last row. Push it down. */
-.neo-controls > .column > button:last-child { margin-top: auto; }
 /* Vertical sizes track the window height, so a large window fits the whole app on one screen while a short one
    keeps every box usable and scrolls instead. The upload and query boxes are sized so the three control columns
    come out roughly level with column 3, which ends at its Submit button. */
@@ -184,8 +182,8 @@ html, body { height: 100%; }
   text-overflow: ellipsis;
 }
 .neo-step h2 + * { margin-top: 0; }
-/* The "optional …" hint sits tight under the section 3 heading rather than floating. */
-.neo-hint { color: var(--neo-ink-mid); font-size: 0.9rem; font-style: italic; margin: -2px 0 10px; }
+/* Hints belong to the control right above them, so they get no padding of their own and almost no margin. */
+.neo-hint { color: var(--neo-ink-mid); font-size: 0.9rem; font-style: italic; margin: -4px 0 0; padding: 0; }
 
 /* Primary action buttons get the confident accent; keep the label calm. */
 .gradio-container button.primary,
