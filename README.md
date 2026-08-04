@@ -24,6 +24,10 @@ Every PDF page is converted into an image, because NeoMME reads a page as pixels
 The model encodes each page image into a grid of token vectors, a few pages per forward pass, and it scores your
 query against those grids with MaxSim. Scoring runs inside the app, so there is no separate index server.
 
+The same forward pass also produces one pooled vector per page, so the app indexes both representations and you
+can switch scoring under the query box. MaxSim is the default, and it is the only scoring the published retrieval
+numbers cover, so treat the dense option as a comparison rather than a supported mode.
+
 A small vision language model on the Space writes the answer from the top pages, so a visitor needs no API key.
 OpenAI, Anthropic and Gemini are also in the provider list, and they answer dense pages better. A visitor's key is
 used for that one request and is never stored.

@@ -3,11 +3,13 @@
 Runs on `transformers` alone: `NeoMMEForRetrieval` + `NeoMMEProcessor` from a converted checkpoint. The research
 `neomme` package is NOT a dependency, which is the point — this is what a user of the published model does.
 
-Flow: upload PDFs/images -> rasterize (pypdfium2 for PDFs) -> one forward per page batch, keeping the per-page
-multivector grids in memory. A query is encoded and scored against them with exact late-interaction MaxSim
-(`processor.score_retrieval`, per-token L2-normalized cosine — the objective the checkpoint was evaluated with),
-no external index server. The top pages are then sent, as images, to a user-selected VLM (OpenAI / Anthropic /
-Gemini) with the user's own API key to synthesize an answer.
+Flow: upload PDFs/images -> rasterize (pypdfium2 for PDFs) -> one forward per page batch, keeping both the
+per-page multivector grids and the per-page pooled dense vectors in memory. One forward produces both, so
+indexing both costs nothing extra. A query is then scored either with exact late-interaction MaxSim
+(`processor.score_retrieval`, per-token L2-normalized cosine — the objective the checkpoint was evaluated with)
+or with cosine on the pooled vectors, whichever the visitor picks; MaxSim is the default and the only scoring the
+published numbers cover. No external index server. The top pages are then sent, as images, to a user-selected VLM
+(OpenAI / Anthropic / Gemini) with the user's own API key to synthesize an answer.
 
 ZeroGPU: the GPU-heavy work (encode + score) lives in @spaces.GPU functions, so a GPU is allocated only for the
 duration of those calls and released afterwards. The model is placed on cuda at import (ZeroGPU runs a CUDA
@@ -60,6 +62,12 @@ _EXAMPLE_QUERIES = (
     "How fast is ColPali vs traditional text-based RAG?",
 )
 
+# How a query is scored against the index. MaxSim is the default: it is what the checkpoint was trained and
+# evaluated with, so the dense option is there to compare against, not as an equally supported mode.
+_MAXSIM = "Late interaction (MaxSim)"
+_DENSE = "Dense (cosine)"
+_SCORINGS = (_MAXSIM, _DENSE)
+
 
 @dataclass
 class Corpus:
@@ -72,6 +80,7 @@ class Corpus:
 
     pages: list[tuple[str, Image.Image]] = field(default_factory=list)
     doc_embeds: list[torch.Tensor] = field(default_factory=list)  # per-page multivector grids, on the CPU
+    dense_embeds: torch.Tensor = field(default_factory=lambda: torch.empty(0))  # (n_pages, dense_dim), on the CPU
 
 
 def _pdf_to_images(path: str, dpi: int = 150) -> list[Image.Image]:
@@ -98,35 +107,48 @@ def _pages_from_files(paths: list[str]) -> list[tuple[str, Image.Image]]:
 
 
 @spaces.GPU(duration=_GPU_DURATION)
-def _encode_documents(images: list[Image.Image]) -> list[torch.Tensor]:
-    """Page images -> one (n_tokens, embedding_dim) grid per page, on the CPU.
+def _encode_documents(images: list[Image.Image]) -> tuple[list[torch.Tensor], torch.Tensor]:
+    """Page images -> one (n_tokens, embedding_dim) grid per page plus one pooled vector per page, on the CPU.
 
-    Trimmed to each page's real tokens: the head zeroes padding rows, but a ragged list is what
+    Both come out of the same forward, so keeping both costs one extra vector per page.
+
+    The grids are trimmed to each page's real tokens: the head zeroes padding rows, but a ragged list is what
     `score_retrieval` wants and it keeps a long page from padding every short one in the batch.
     """
     grids: list[torch.Tensor] = []
+    pooled: list[torch.Tensor] = []
     for start in range(0, len(images), _PAGE_BATCH):
         batch = processor(images=images[start : start + _PAGE_BATCH], max_side=_MAX_SIDE).to(_DEVICE)
         with torch.no_grad():
-            embeddings = model(**batch).multivector_embeddings.float().cpu()
+            output = model(**batch)
+        embeddings = output.multivector_embeddings.float().cpu()
+        pooled.append(output.dense_embeddings.float().cpu())
         lengths = batch["attention_mask"].sum(dim=-1).tolist()
         grids.extend(embeddings[row, :length] for row, length in enumerate(lengths))
-    return grids
+    return grids, torch.cat(pooled)
 
 
 @spaces.GPU
-def _score(query: str, doc_embeds: list[torch.Tensor]) -> list[float]:
-    """Encode the query and score it against `doc_embeds` with exact MaxSim; returns one score per page."""
+def _score(query: str, corpus: Corpus, scoring: str) -> list[float]:
+    """Encode the query and score every indexed page with the scoring the visitor picked.
+
+    Both heads L2-normalize their output, so the dense dot product below is already a cosine.
+    """
     inputs = processor(text=[query], text_role="query").to(_DEVICE)
     with torch.no_grad():
-        query_embeddings = model(**inputs).multivector_embeddings.float().cpu()
-    return processor.score_retrieval(query_embeddings, doc_embeds)[0].tolist()
+        output = model(**inputs)
+    if scoring == _DENSE:
+        query_dense = output.dense_embeddings.float().cpu()
+        return (query_dense @ corpus.dense_embeds.T)[0].tolist()
+    query_multivector = output.multivector_embeddings.float().cpu()
+    return processor.score_retrieval(query_multivector, corpus.doc_embeds)[0].tolist()
 
 
 def _index(pages: list[tuple[str, Image.Image]]) -> tuple[Corpus, str]:
     """Encode `pages` into a fresh corpus for this session, and the status line that reports it."""
-    corpus = Corpus(pages=pages, doc_embeds=_encode_documents([image for _, image in pages]))
-    return corpus, f"✓ Indexed {len(pages)} pages. Ready to search."
+    grids, pooled = _encode_documents([image for _, image in pages])
+    corpus = Corpus(pages=pages, doc_embeds=grids, dense_embeds=pooled)
+    return corpus, f"✓ Indexed {len(pages)} pages, late interaction and dense. Ready to search."
 
 
 def add_sample(files) -> list[str]:
@@ -151,8 +173,8 @@ def build_index(files) -> tuple[Corpus, str]:
     return _index(_pages_from_files([str(file) for file in files]))
 
 
-def _retrieve(query: str, top_k: int, corpus: Corpus) -> list[tuple[str, Image.Image]]:
-    scores = _score(query, corpus.doc_embeds)
+def _retrieve(query: str, top_k: int, scoring: str, corpus: Corpus) -> list[tuple[str, Image.Image]]:
+    scores = _score(query, corpus, scoring)
     order = sorted(range(len(scores)), key=lambda i: -scores[i])[: int(top_k)]
     return [(f"{corpus.pages[i][0]}  ({scores[i]:.3f})", corpus.pages[i][1]) for i in order]
 
@@ -170,12 +192,12 @@ _NO_KEY_NOTE = (
 )
 
 
-def search(query: str, top_k: int, provider: str, api_key: str, model: str, corpus: Corpus):
+def search(query: str, top_k: int, scoring: str, provider: str, api_key: str, model: str, corpus: Corpus):
     if not corpus or not corpus.doc_embeds:
         return [], "Build the index first.", "Build the index first."
     if not query.strip():
         return [], "Enter a query.", "Enter a query."
-    ranked = _retrieve(query, top_k, corpus)
+    ranked = _retrieve(query, top_k, scoring, corpus)
     gallery = [(image, label) for label, image in ranked]
     if PROVIDERS[provider].needs_key and not api_key.strip():  # skip cleanly rather than erroring
         return gallery, _NO_KEY_NOTE, _NO_KEY_NOTE
@@ -260,6 +282,12 @@ def _demo():
                         # default argument, or every button would close over the last loop value
                         gr.Button(example, size="sm", variant="secondary").click(lambda text=example: text, None, query)
                 top_k = gr.Slider(1, 10, value=3, step=1, label="Pages to retrieve")
+                scoring = gr.Radio(
+                    list(_SCORINGS),
+                    value=_MAXSIM,
+                    label="Scoring",
+                    info="MaxSim compares every query token to the page. Dense compares one vector per page.",
+                )
             with gr.Column(scale=3, min_width=240):
                 gr.Markdown("## 3 · Generate an answer", elem_classes="neo-step")
                 gr.Markdown(
@@ -301,7 +329,9 @@ def _demo():
 
         provider.change(_on_provider_change, [provider], [api_key, model])
         build_btn.click(build_index, [files], [corpus, status])
-        search_btn.click(search, [query, top_k, provider, api_key, model, corpus], [gallery, answer_md, answer_raw])
+        search_btn.click(
+            search, [query, top_k, scoring, provider, api_key, model, corpus], [gallery, answer_md, answer_raw]
+        )
         sample_btn.click(add_sample, files, files)
     return demo
 
