@@ -1,0 +1,5 @@
+# Running the app outside Spaces. The Space build spec omits `gradio` and `spaces` because the runtime supplies
+# them; a local venv has to install them itself, at the versions the Space actually runs.
+-r requirements.txt
+gradio==6.22.0
+spaces>=0.30

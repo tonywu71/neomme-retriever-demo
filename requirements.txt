@@ -1,0 +1,18 @@
+# NeoMME demo Space — Gradio SDK, ZeroGPU. This file is the Space build spec; use requirements-local.txt to run
+# the app on your own machine.
+# `gradio`, `spaces` and `huggingface_hub` are deliberately absent: the Spaces runtime preinstalls and manages
+# them, and pinning them here either fails to resolve or breaks the ZeroGPU hijack.
+torch                       # unpinned on purpose: the runtime preinstalls a version ZeroGPU accepts (2.8.0, 2.9.1, 2.10.0, 2.11.0)
+torchvision                 # not preinstalled; the answer VLM's image processor is torchvision-only (NeoMME's own is PIL)
+pypdfium2>=4.0              # PDF page rasterization
+numpy>=2.0
+pillow>=10.0
+# The default answer model runs on the Space itself (see vlm.py). These are the optional bring-your-own-key
+# providers, imported lazily so only the one actually picked has to be installed.
+openai>=1.0
+anthropic>=0.40
+google-genai>=1.0
+# The model runs on `transformers` alone — the research `neomme` package is NOT needed. NeoMME is not in a
+# transformers release yet, so install the port from source. Swap this for a plain `transformers>=X` pin the day
+# the PR lands upstream: https://github.com/tonywu71/transformers/pull/2
+transformers @ git+https://github.com/tonywu71/transformers.git@add-neomme
