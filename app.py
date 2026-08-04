@@ -55,17 +55,18 @@ model = NeoMMEForRetrieval.from_pretrained(_REPO, dtype=_DTYPE).to(_DEVICE).eval
 # working, and there is no such thing as a document you cannot remove.
 _SAMPLE_PDF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples", "colpali_paper.pdf")
 
-# Queries that actually have an answer in the sample, so the demo shows a hit rather than a shrug.
+# Queries that actually have an answer in the sample, so the demo shows a hit rather than a shrug. The short label
+# keeps the three buttons on one line; clicking one puts the full query in the box.
 _EXAMPLE_QUERIES = (
-    "What is token pooling?",
-    "Describe the ColPali architecture.",
-    "How fast is ColPali vs traditional text-based RAG?",
+    ("token pooling", "What is token pooling?"),
+    ("ColPali arch.", "Describe the ColPali architecture."),
+    ("speed vs RAG", "How fast is ColPali vs traditional text-based RAG?"),
 )
 
 # How a query is scored against the index. MaxSim is the default: it is what the checkpoint was trained and
 # evaluated with, so the dense option is there to compare against, not as an equally supported mode.
-_MAXSIM = "Late interaction (MaxSim)"
-_DENSE = "Dense (cosine)"
+_MAXSIM = "MaxSim"
+_DENSE = "Dense"
 _SCORINGS = (_MAXSIM, _DENSE)
 
 
@@ -234,10 +235,9 @@ _HERO = f"""
 
 _ABOUT = """
 NeoMME encodes each page as a grid of token vectors and scores a query against them with MaxSim
-(the ColBERT-style late-interaction objective), so retrieval works directly on the *rendered* page —
-no OCR step. The answer is written by a small vision-language model running on this Space, so no key is
-needed; switching to OpenAI / Anthropic / Gemini with your own key gives a stronger answer on dense pages and
-the key is used only for that request, never stored. Re-index whenever you change documents.
+(the ColBERT-style late-interaction objective), so retrieval works directly on the *rendered* page,
+no OCR step. The retrieved pages are then fed to a vision-language model, which defaults to a small one
+running on this Space. Re-index whenever you change documents.
 """
 
 
@@ -277,52 +277,53 @@ def _demo():
                     label="Query", placeholder="What does the report say about …?", lines=4, elem_classes="neo-query"
                 )
                 gr.Markdown("*example queries — click one to fill the box above*", elem_classes="neo-hint")
-                with gr.Row():
-                    for example in _EXAMPLE_QUERIES:
+                with gr.Row(elem_classes="neo-examples"):
+                    for label, example in _EXAMPLE_QUERIES:
                         # default argument, or every button would close over the last loop value
-                        gr.Button(example, size="sm", variant="secondary").click(lambda text=example: text, None, query)
-                top_k = gr.Slider(1, 10, value=3, step=1, label="Pages to retrieve")
-                scoring = gr.Radio(
-                    list(_SCORINGS),
-                    value=_MAXSIM,
-                    label="Scoring",
-                    info="MaxSim compares every query token to the page. Dense compares one vector per page.",
-                )
+                        gr.Button(label, size="sm", variant="secondary").click(lambda text=example: text, None, query)
+                with gr.Row():  # side by side, so the control band stays as short as column 3
+                    top_k = gr.Slider(1, 10, value=3, step=1, label="Pages to retrieve")
+                    scoring = gr.Radio(list(_SCORINGS), value=_MAXSIM, label="Scoring")
             with gr.Column(scale=3, min_width=240):
                 gr.Markdown("## 3 · Generate an answer", elem_classes="neo-step")
                 gr.Markdown(
-                    "*the default model runs on this Space, no key needed — switch provider for a stronger answer*",
+                    "*the default model runs on this Space, no key needed*",
                     elem_classes="neo-hint",
                 )
                 provider = gr.Dropdown(choices=list(PROVIDERS), value=LOCAL_PROVIDER, label="Provider")
-                model = gr.Textbox(
-                    label="Model",
-                    value=PROVIDERS[LOCAL_PROVIDER].default_model,
-                    placeholder=PROVIDERS[LOCAL_PROVIDER].default_model,
-                    max_lines=1,
-                )
-                api_key = gr.Textbox(
-                    label="API key",
-                    type="password",
-                    placeholder=PROVIDERS[LOCAL_PROVIDER].key_hint,
-                    interactive=PROVIDERS[LOCAL_PROVIDER].needs_key,
-                )
+                with gr.Row():  # side by side, so the column ends near the other two
+                    model = gr.Textbox(
+                        label="Model",
+                        value=PROVIDERS[LOCAL_PROVIDER].default_model,
+                        placeholder=PROVIDERS[LOCAL_PROVIDER].default_model,
+                        max_lines=1,
+                    )
+                    api_key = gr.Textbox(
+                        label="API key",
+                        type="password",
+                        placeholder=PROVIDERS[LOCAL_PROVIDER].key_hint,
+                        interactive=PROVIDERS[LOCAL_PROVIDER].needs_key,
+                    )
                 search_btn = gr.Button("Submit", variant="primary", size="sm")
 
         with gr.Row(equal_height=False):
             with gr.Column(scale=3, min_width=320):
                 gr.Markdown("## 4 · Retrieved pages", elem_classes="neo-step")
-                gallery = gr.Gallery(label="Ranked pages", columns=3, height=520, object_fit="contain")
+                # Height comes from the CSS, which scales it with the window instead of pinning it.
+                gallery = gr.Gallery(label="Ranked pages", columns=3, object_fit="contain", elem_classes="neo-gallery")
             with gr.Column(scale=2, min_width=280):
                 gr.Markdown("## 5 · Answer", elem_classes="neo-step")
                 with gr.Tabs():  # markdown-rendered by default; raw for copy/inspection
                     with gr.Tab("Rendered"):
                         answer_md = gr.Markdown(elem_id="neo-answer")
                     with gr.Tab("Raw"):
-                        answer_raw = gr.Textbox(label="Raw answer", lines=18, interactive=False)
+                        answer_raw = gr.Textbox(
+                            label="Raw answer", lines=10, interactive=False, elem_classes="neo-answer"
+                        )
 
-        gr.Markdown("## Cite", elem_classes="neo-step")
-        gr.Code(value=_BIBTEX, language=None, label="BibTeX (click to copy)", wrap_lines=False)
+        # Collapsed, because nobody needs the BibTeX on arrival and an open block costs the page a screenful.
+        with gr.Accordion("Cite", open=False):
+            gr.Code(value=_BIBTEX, language=None, label="BibTeX (click to copy)", wrap_lines=False)
 
         # Per-session corpus: a Space serves many visitors from one process, so this must never be global.
         corpus = gr.State(Corpus())

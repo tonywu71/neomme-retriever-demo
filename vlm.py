@@ -47,7 +47,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
     LOCAL_PROVIDER: ProviderSpec(
         label=LOCAL_PROVIDER,
         default_model=LOCAL_MODEL_ID,
-        key_hint="no key needed — runs on this Space",
+        key_hint="no key needed",
         needs_key=False,
     ),
     # The hosted defaults are each provider's mid/low-cost vision model, not its flagship: a visitor is spending

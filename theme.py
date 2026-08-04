@@ -94,6 +94,13 @@ NEOMME_CSS = """
 
 body, .gradio-container { background: var(--neo-bg); color: var(--neo-ink); }
 
+/* Fit the app to the window when there is room for it, and scroll inside the container when there is not. On a
+   Space the app runs in an iframe whose own document does not scroll, so the container has to own the scrolling
+   or the bottom of a tall page becomes unreachable. */
+html, body { height: 100%; }
+.gradio-container { max-height: 100dvh; overflow-y: auto; }
+.contain > .column { gap: 10px; }   /* Gradio's 16px between sections is more than this page needs */
+
 /* Editorial headings for the Markdown blocks (title + numbered steps). */
 .gradio-container h1, .gradio-container h2, .gradio-container h3 {
   font-family: var(--neo-font-display);
@@ -101,13 +108,13 @@ body, .gradio-container { background: var(--neo-bg); color: var(--neo-ink); }
   letter-spacing: -0.015em;
   font-weight: 600;
 }
-.gradio-container h1 { font-size: 2.1rem; line-height: 1.1; }
+.gradio-container h1 { font-size: 1.85rem; line-height: 1.1; }
 .gradio-container h2 { font-size: 1.15rem; }
 
 /* Compact hero: glyph + wordmark + subtitle on a single line, minimal vertical footprint. */
 .neo-hero-bar { display: flex; align-items: center; gap: 12px; margin: 2px 0 10px; }
 .neo-hero-bar h1 { margin: 0; }
-.neo-glyph { height: 2.2rem; width: auto; display: block; }
+.neo-glyph { height: 1.9rem; width: auto; display: block; }
 .neo-subtitle {
   font-family: var(--neo-mono, "JetBrains Mono", monospace);
   font-size: 10.5px;
@@ -125,13 +132,14 @@ body, .gradio-container { background: var(--neo-bg); color: var(--neo-ink); }
 
 /* "How it works" is always open above the columns. h3 has no size rule of its own and would otherwise inherit
    a browser default LARGER than the 1.15rem column headings, so pin it just below them. */
-.neo-about { margin: 0 0 6px; }
-.neo-about h3 { font-size: 1.02rem; margin: 2px 0 6px; }
+.neo-about { margin: 0 0 2px; font-size: 0.9rem; line-height: 1.4; }
+.neo-about h3 { font-size: 1.02rem; margin: 2px 0 4px; }
+.neo-about p { margin: 0; }
 
 /* Equal-height control columns. equal_height makes Gradio flex-grow EVERY block, which splits the slack
    across section 3's fields and spreads them apart. Reset that, then let only the single big boxes (upload,
    query) absorb the extra height; everything else packs to the top with the slack falling at the bottom. */
-.neo-controls > .column { justify-content: flex-start; }
+.neo-controls > .column { justify-content: flex-start; gap: 8px; }   /* the 16px default is most of the slack */
 /* Direct children only — so the Provider/Model blocks INSIDE their row keep growing side by side. */
 .neo-controls > .column > .block,
 .neo-controls > .column > .form,
@@ -139,8 +147,33 @@ body, .gradio-container { background: var(--neo-bg); color: var(--neo-ink); }
 .neo-controls > .column > button { flex-grow: 0 !important; }   /* a Button is a bare <button>, not a .block */
 .neo-controls > .column > .neo-upload,
 .neo-controls > .column > .neo-query { flex-grow: 1 !important; }
-.neo-upload { min-height: 250px; }        /* also its constant height when a file is dropped */
-.neo-query textarea { min-height: 202px; height: 100%; }
+/* Column 3 has no growing box, so its Submit would float above the other two columns' last row. Push it down. */
+.neo-controls > .column > button:last-child { margin-top: auto; }
+/* Vertical sizes track the window height, so a large window fits the whole app on one screen while a short one
+   keeps every box usable and scrolls instead. */
+/* Sized so the three control columns come out roughly level: column 3 ends at its Submit button, and the upload
+   and query boxes are what would otherwise run past it. */
+.neo-upload { min-height: clamp(110px, 13dvh, 180px); }   /* also its constant height when a file is dropped */
+.neo-query textarea { min-height: clamp(64px, 7.5dvh, 130px); height: 100%; }
+/* The gallery and the answer share one height, so the results row is as short as the taller of the two. */
+.neo-gallery { height: clamp(150px, 19dvh, 300px); }
+#neo-answer { max-height: clamp(150px, 19dvh, 300px); }
+.neo-answer textarea { height: clamp(140px, 17dvh, 270px); }
+/* One line of example buttons rather than three wrapped ones, and one line of scoring options. */
+.neo-examples { flex-wrap: nowrap; gap: 6px; }
+/* min-width lets the three buttons share the column instead of overflowing it, since nowrap otherwise pins each
+   one to its text width. */
+.neo-examples button {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  padding-left: 6px;
+  padding-right: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.neo-step h2 + * { margin-top: 0; }
+#neo-answer { overflow-y: auto; }
 /* The "optional …" hint sits tight under the section 3 heading rather than floating. */
 .neo-hint { color: var(--neo-ink-mid); font-size: 0.9rem; font-style: italic; margin: -2px 0 10px; }
 
