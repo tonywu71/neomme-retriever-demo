@@ -79,10 +79,7 @@ runtime installs both and pinning them breaks ZeroGPU. `requirements-local.txt` 
 bfloat16 and uses 1.43GB of memory, after downloading about 1.5GB of weights on the first launch. Only cpu falls
 back to float32.
 
-If the answer model fails to load, the app keeps working and offers only the providers that need a key. The usual
-cause is a torchvision version that does not match the installed torch, which raises
-`operator torchvision::nms does not exist`. Install the matching pair, which is 0.23 for torch 2.8, 0.24 for 2.9,
-0.25 for 2.10 and 0.26 for 2.11.
+If the answer model fails to load, the app still starts and offers only the providers that need a key.
 
 ### Environment variables
 
