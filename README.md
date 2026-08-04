@@ -52,9 +52,17 @@ Space settings page.
 
 ## Deploying
 
-GitHub holds the source of truth. The workflow in `.github/workflows/sync-to-hub.yml` copies the repo to the
-Space, and it currently runs only when you start it by hand from the Actions tab. Until the `push:` trigger is
-uncommented, deploy like this.
+GitHub holds the source of truth. Every push to `main` runs `.github/workflows/sync-to-hub.yml`, which copies the
+repo to the Space, and you can also start it by hand from the Actions tab. Pushes that only touch `.github` are
+skipped, because the action never uploads that directory.
+
+The workflow needs a GitHub Actions secret named `HF_TOKEN`, which is a write token for the `tonywu71` account.
+It is not the same token as the Space secret of the same name, which is a read token for the `Hcompany` org.
+
+A code change restarts the Space in about 40 seconds. A change to `requirements.txt` or to the front matter of
+this file triggers a full rebuild instead, which takes several minutes because `transformers` installs from git.
+
+To deploy without the workflow, for example while debugging:
 
 ```bash
 hf upload tonywu71/neomme-retriever-demo . --repo-type space \

@@ -1,11 +1,19 @@
 name: Sync to Hugging Face Hub
 
-# Deliberately manual for now: uncomment the `push` block below once the Space is known to build and run, so that
-# every merge to main mirrors automatically. Until then this only fires from the Actions tab.
+# GitHub is the source of truth and the Space is the deploy target, so every push to main is copied over.
+# Changes under .github are skipped because hub-sync never uploads that directory, which would make the sync a
+# no-op that restarts the Space for nothing.
 on:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
+    paths-ignore: ['.github/**']
   workflow_dispatch:
+
+# Two pushes close together would otherwise race, and the Space would end up matching whichever upload finished
+# last rather than the newer commit.
+concurrency:
+  group: sync-to-hub
+  cancel-in-progress: true
 
 jobs:
   sync:
