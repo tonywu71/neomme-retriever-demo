@@ -22,8 +22,7 @@ ranked highest.
 
 Every PDF page is converted into an image, because NeoMME reads a page as pixels instead of as extracted text.
 The model encodes each page image into a grid of token vectors, a few pages per forward pass, and it scores your
-query against those grids with MaxSim, which matches every query token to the closest token on the page and adds
-up the matches. Scoring runs inside the app, so there is no separate index server.
+query against those grids with MaxSim. Scoring runs inside the app, so there is no separate index server.
 
 A small vision language model on the Space writes the answer from the top pages, so a visitor needs no API key.
 OpenAI, Anthropic and Gemini are also in the provider list, and they answer dense pages better. A visitor's key is
@@ -93,9 +92,3 @@ If the answer model fails to load, the app still starts and offers only the prov
 | `NEOMME_GPU_DURATION` | 120 | how many seconds of GPU time indexing asks ZeroGPU for |
 | `NEOMME_VLM_GPU_DURATION` | 60 | how many seconds of GPU time answering asks ZeroGPU for |
 | `PORT` | 7860 | the local server port. Gradio's own `GRADIO_SERVER_PORT` has no effect, because `app.py` passes the port explicitly |
-
-The two GPU duration variables only apply on the Space, where a GPU is attached for the length of one call and
-released afterwards. ZeroGPU compares the number you declare against the visitor's remaining daily quota, not
-against the time the work actually takes, so a visitor with 90 seconds left cannot start indexing at the default
-of 120 even when the job would finish in 10. A smaller number also gets a better position in the GPU queue, so
-lower both once the Space logs show how long real calls take.
