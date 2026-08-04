@@ -15,89 +15,90 @@ startup_duration_timeout: 1h
 
 # NeoMME retrieval demo
 
-Upload PDFs or images, index them with NeoMME, ask a question, get an answer from the top-ranked pages.
+Upload PDFs or images, index them with NeoMME, then ask a question and read an answer taken from the pages that
+ranked highest.
 
-Pages are rasterized (`pypdfium2`), encoded one batch at a time into a grid of token vectors per page, and scored
-against the query with exact MaxSim (`processor.score_retrieval`). No index server. The answer is written by a
-small VLM running on the Space, so no key is needed; OpenAI / Anthropic / Gemini stay in the picker for stronger
-answers on dense pages, using the visitor's key for that request only.
+## How it works
 
-It runs on `transformers` alone (`NeoMMEForRetrieval` + `NeoMMEProcessor`). The research `neomme` package is
-deliberately not a dependency, so this doubles as a check that the published model is usable the way anyone else
-would use it.
+Every PDF page is converted into an image, because NeoMME reads a page as pixels instead of as extracted text.
+The model encodes each page image into a grid of token vectors, a few pages per forward pass, and it scores your
+query against those grids with MaxSim, which matches every query token to the closest token on the page and adds
+up the matches. Scoring runs inside the app, so there is no separate index server.
+
+A small vision language model on the Space writes the answer from the top pages, so a visitor needs no API key.
+OpenAI, Anthropic and Gemini are also in the provider list, and they answer dense pages better. A visitor's key is
+used for that one request and is never stored.
+
+The app depends on `transformers` alone, through `NeoMMEForRetrieval` and `NeoMMEProcessor`. The research `neomme`
+package is deliberately not a dependency, so the app also shows that the published model works the way anyone
+outside the team would use it.
 
 ## Space settings
 
-These live on the Space, not in git, and a rebuild from scratch will not restore them.
+These settings live on the Space rather than in git, so a rebuild from scratch does not restore them.
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| Hardware | `zero-a10g` | the app is written for ZeroGPU: `import spaces` before torch, `@spaces.GPU` on encode / score / generate, module-scope `.to("cuda")` |
-| Secret `HF_TOKEN` | read token for the `Hcompany` org | `NEOMME_RELEASE` is a private repo |
+| Hardware | `zero-a10g` | the app is written for ZeroGPU, with `import spaces` before torch, `@spaces.GPU` on encode, score and generate, and the models placed on cuda at import |
+| Secret `HF_TOKEN` | a read token for the `Hcompany` org | the checkpoint in `NEOMME_RELEASE` is private |
 | Variable `NEOMME_RELEASE` | `Hcompany/neomme-250M-retrieval-dev-transformers-v0.3` | which checkpoint to serve |
-| Variable `GRADIO_SSR_MODE` | `false` | **required for correct styling**, see below |
+| Variable `GRADIO_SSR_MODE` | `false` | required for correct styling, because Gradio's server side rendering puts the app's CSS in the page before its own component stylesheets, which then override it. With rendering off, the CSS is applied last, as it is locally |
 
-`hardware:` in the frontmatter above is silently ignored; hardware is set at creation or in Space settings.
-
-### Why SSR is off
-
-With SSR on, Gradio writes the `css=` string into `<head>` at render time, ahead of its own component
-stylesheets. Equal specificity, later wins, so Gradio's rules override this app's: the hero glyph loses
-`height: 2.2rem` and renders at the webp's natural size, and the layout loses its `max-width`. With SSR off the
-CSS ships inside `gradio_config` and is injected after the bundle, which is also what happens locally.
-
-Turning SSR back on means making the CSS immune to load order first, for example by prefixing selectors with
-`.gradio-container`.
+Hardware cannot be set from this repo. The `hardware:` key in the front matter above is ignored, so use the
+Space settings page.
 
 ## Deploying
 
-GitHub is the source of truth. `.github/workflows/sync-to-hub.yml` mirrors to the Space but is
-**manual-dispatch only** until the `push:` trigger is uncommented. Until then:
+GitHub holds the source of truth. The workflow in `.github/workflows/sync-to-hub.yml` copies the repo to the
+Space, and it currently runs only when you start it by hand from the Actions tab. Until the `push:` trigger is
+uncommented, deploy like this.
 
 ```bash
-hf upload tonywu71/neomme-retriever-demo . --repo-type space --exclude "**/__pycache__/**" --exclude ".git/**" --exclude ".github/**"
+hf upload tonywu71/neomme-retriever-demo . --repo-type space \
+  --exclude "**/__pycache__/**" --exclude ".git/**" --exclude ".github/**"
 ```
 
-The sync is one-way, so anything edited in the Space's web UI or by hot-reload is lost on the next push.
+The copy only goes from GitHub to the Space, so anything you edit in the Space web UI is lost on the next deploy.
 
 ## Running locally
 
-Use a separate venv: these requirements leave `torch` unpinned and would fight the research repo's pins.
+Use a separate virtual environment, because these requirements leave `torch` unpinned and would conflict with the
+research repo's pinned versions.
 
 ```bash
 uv venv --python 3.12 .venv-space
 VIRTUAL_ENV=.venv-space uv pip install -r requirements-local.txt
 .venv-space/bin/python app.py                     # http://127.0.0.1:7860
-.venv-space/bin/python smoke_test.py              # offline check: tiny random model, 3 images, one query
+.venv-space/bin/python smoke_test.py              # offline check with a tiny random model
 ```
 
-`requirements.txt` is the Space build spec and omits `gradio` and `spaces`, which the Spaces runtime preinstalls
-and which break the ZeroGPU hijack if pinned. `requirements-local.txt` adds them back.
+`requirements.txt` is the build file for the Space, and it leaves out `gradio` and `spaces` because the Spaces
+runtime installs both and pinning them breaks ZeroGPU. `requirements-local.txt` adds them back for local runs.
 
-`HF_TOKEN` must be able to read the private checkpoint. On Apple silicon the app picks mps and bfloat16, 1.43GB
-resident, ~1.5GB downloaded on first launch. Only cpu falls back to float32.
+`HF_TOKEN` has to be a token that can read the private checkpoint. On Apple silicon the app selects mps and
+bfloat16 and uses 1.43GB of memory, after downloading about 1.5GB of weights on the first launch. Only cpu falls
+back to float32.
+
+If the answer model fails to load, the app keeps working and offers only the providers that need a key. The usual
+cause is a torchvision version that does not match the installed torch, which raises
+`operator torchvision::nms does not exist`. Install the matching pair, which is 0.23 for torch 2.8, 0.24 for 2.9,
+0.25 for 2.10 and 0.26 for 2.11.
+
+### Environment variables
 
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `NEOMME_RELEASE` | `Hcompany/neomme-250M-retrieval-dev-transformers-v0.3` | any repo the port can load |
-| `NEOMME_VLM_LOCAL` | `LiquidAI/LFM2.5-VL-450M` | empty disables local generation, and the torchvision requirement with it |
-| `NEOMME_VLM_MAX_NEW_TOKENS` | 512 | answer length, the main lever on generation time |
-| `NEOMME_MAX_SIDE` | 2048 | page resolution, trading quality for speed (the ViDoRe eval cap) |
-| `NEOMME_PAGE_BATCH` | 4 | pages per forward, bounding native-resolution memory |
-| `NEOMME_GPU_DURATION` | 120 | ZeroGPU seconds declared for indexing |
-| `NEOMME_VLM_GPU_DURATION` | 60 | ZeroGPU seconds declared for generation |
-| `PORT` | 7860 | local server port; Gradio's `GRADIO_SERVER_PORT` has no effect here |
+| `NEOMME_VLM_LOCAL` | `LiquidAI/LFM2.5-VL-450M` | leave empty to disable local answers, which also removes the need for torchvision |
+| `NEOMME_VLM_MAX_NEW_TOKENS` | 512 | how long an answer can be, and the main control on how long generation takes |
+| `NEOMME_MAX_SIDE` | 2048 | the longest side a page image is resized to, trading quality for speed. 2048 is the cap used in the ViDoRe evaluation |
+| `NEOMME_PAGE_BATCH` | 4 | how many pages go through one forward pass, which bounds memory at full page resolution |
+| `NEOMME_GPU_DURATION` | 120 | how many seconds of GPU time indexing asks ZeroGPU for |
+| `NEOMME_VLM_GPU_DURATION` | 60 | how many seconds of GPU time answering asks ZeroGPU for |
+| `PORT` | 7860 | the local server port. Gradio's own `GRADIO_SERVER_PORT` has no effect, because `app.py` passes the port explicitly |
 
-ZeroGPU checks a visitor's remaining quota against the **declared** duration, not the actual runtime, so trim the
-two `*_GPU_DURATION` values once the logs show real timings. Smaller also ranks higher in the GPU queue.
-
-### `operator torchvision::nms does not exist`
-
-The torchvision wheel does not match the installed torch (2.8 to 0.23, 2.9 to 0.24, 2.10 to 0.25, 2.11 to 0.26).
-`vlm.py` catches this at import and falls back to the key-only providers, so the symptom is "no local answers"
-rather than a crash.
-
-## Files
-
-`app.py` UI, indexing and search. `vlm.py` answer generation. `theme.py` theme and CSS. `smoke_test.py` offline
-check. `samples/` the sample-button PDF. `assets/` the glyph inlined into the hero as a data URI.
+The two GPU duration variables only apply on the Space, where a GPU is attached for the length of one call and
+released afterwards. ZeroGPU compares the number you declare against the visitor's remaining daily quota, not
+against the time the work actually takes, so a visitor with 90 seconds left cannot start indexing at the default
+of 120 even when the job would finish in 10. A smaller number also gets a better position in the GPU queue, so
+lower both once the Space logs show how long real calls take.
