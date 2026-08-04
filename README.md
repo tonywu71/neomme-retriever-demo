@@ -35,12 +35,13 @@ would use it.
 
 ## Where this code lives
 
-GitHub is the source of truth; the Space is a mirror of it, pushed by `.github/workflows/sync-to-hub.yml`. That
-workflow is **manual-dispatch only** for now, so a push to `main` does not touch the Space until the `push:`
-trigger is uncommented. Until then, mirror by hand:
+GitHub is the source of truth (<https://github.com/tonywu71/neomme-retriever-demo>); the Space
+(<https://huggingface.co/spaces/tonywu71/neomme-retriever-demo>) is a mirror of it, pushed by
+`.github/workflows/sync-to-hub.yml`. That workflow is **manual-dispatch only** for now, so a push to `main` does
+not touch the Space until the `push:` trigger is uncommented. Until then, mirror by hand:
 
 ```bash
-hf upload tonywu71/<space-name> . --repo-type space --exclude "**/__pycache__/**" --exclude ".git/**"
+hf upload tonywu71/neomme-retriever-demo . --repo-type space --exclude "**/__pycache__/**" --exclude ".git/**"
 ```
 
 The sync is one-way. Anything edited in the Space's web UI or by hot-reload is overwritten on the next push, so
