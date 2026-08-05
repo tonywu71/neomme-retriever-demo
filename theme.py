@@ -39,12 +39,12 @@ NEOMME_CSS = """
   --neo-line:      oklch(89%   0.012 75);
   --neo-ink:       oklch(22%   0.018 70);
   --neo-ink-mid:   oklch(42%   0.018 70);
-  --neo-ink-dim:   oklch(58%   0.016 70);
+  --neo-ink-dim:   oklch(50%   0.016 70);
   --neo-accent:    oklch(42%   0.13  25);   /* oxblood */
   --neo-accent-2:  oklch(46%   0.10 150);   /* moss */
   --neo-code-bg:   oklch(95%   0.018 75);
 
-  --neo-font-display: "General Sans", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --neo-font-display: "General Sans", "Avenir Next", "Helvetica Neue", sans-serif;
 }
 
 .dark, .dark .gradio-container {
@@ -54,7 +54,7 @@ NEOMME_CSS = """
   --neo-line:      oklch(28%   0.014 65);
   --neo-ink:       oklch(92%   0.012 75);
   --neo-ink-mid:   oklch(72%   0.015 75);
-  --neo-ink-dim:   oklch(55%   0.018 75);
+  --neo-ink-dim:   oklch(68%   0.018 75);
   --neo-accent:    oklch(72%   0.13  25);
   --neo-accent-2:  oklch(68%   0.10 150);
   --neo-code-bg:   oklch(22%   0.016 65);
@@ -124,19 +124,38 @@ html, body { height: 100%; }
   font-weight: 500;
 }
 
-/* Compact control band + section headings: keep the whole control area above the fold. */
-.neo-controls { gap: 18px; }
-.neo-status { color: var(--neo-ink-mid); font-size: 0.92rem; margin: 2px 0 0; }
+/* The setup is a real two-step sequence. Settings stay available without competing with the task. */
+.neo-settings { margin: 4px 0 10px; }
+.neo-settings > .label-wrap {
+  color: var(--neo-ink-mid);
+  font-family: var(--neo-font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.neo-workspace { align-items: stretch; gap: clamp(20px, 3vw, 40px); }
+.neo-workspace > .column { justify-content: flex-start; gap: 10px; min-width: 0; }
+.neo-index-panel,
+.neo-query-panel { padding-top: 2px; }
+.neo-status {
+  color: var(--neo-ink-mid);
+  font-family: var(--neo-font-display);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 2px 0 0;
+}
+.neo-run-meta { font-variant-numeric: tabular-nums; }
 .neo-step h2 { margin: 4px 0 8px; }
 .neo-step h3 { margin: 4px 0 6px; }
+.neo-results-heading { margin-top: 12px; }
 .neo-model-links {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 5px;
-  margin: -5px 0 0;
+  margin: -3px 0 0;
   color: var(--neo-ink-dim);
   font-family: var(--neo-font-display);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 .neo-model-links a {
   color: var(--neo-accent);
@@ -147,71 +166,59 @@ html, body { height: 100%; }
 }
 .neo-model-links a:hover { color: color-mix(in oklch, var(--neo-accent) 78%, var(--neo-ink)); }
 
-/* "How it works" is always open above the columns. h3 has no size rule of its own and would otherwise inherit
-   a browser default LARGER than the 1.15rem column headings, so pin it just below them. */
-.neo-about { margin: 0 0 2px; font-size: 0.9rem; line-height: 1.4; }
-.neo-about h3 { font-size: 1.02rem; margin: 2px 0 4px; }
+/* The introduction states the job once, then gets out of the way. */
+.neo-about { max-width: 72ch; margin: 0 0 4px; font-size: 0.98rem; line-height: 1.5; }
 .neo-about p { margin: 0; }
 
-/* Equal-height control columns. equal_height makes Gradio flex-grow EVERY block, which splits the slack
-   across section 3's fields and spreads them apart. Reset that, then let only the single big boxes (upload,
-   query) absorb the extra height; everything else packs to the top with the slack falling at the bottom. */
-.neo-controls > .column { justify-content: flex-start; gap: 8px; }   /* the 16px default is most of the slack */
-/* Direct children only — so the Provider/Model blocks INSIDE their row keep growing side by side. */
-.neo-controls > .column > .block,
-.neo-controls > .column > .form,
-.neo-controls > .column > .row,
-.neo-controls > .column > button { flex-grow: 0 !important; }   /* a Button is a bare <button>, not a .block */
-.neo-controls > .column > .neo-upload,
-.neo-controls > .column > .neo-query { flex-grow: 1 !important; }
-/* Vertical sizes track the window height, so a large window fits the whole app on one screen while a short one
-   keeps every box usable and scrolls instead. The upload and query boxes are sized so the three control columns
-   come out roughly level with column 3, which ends at its Submit button. */
-.neo-upload { min-height: clamp(110px, 13dvh, 180px); }   /* also its constant height when a file is dropped */
-.neo-query textarea { min-height: clamp(64px, 7.5dvh, 130px); height: 100%; }
+/* Natural heights survive new controls and narrow viewports without viewport-subtraction arithmetic. */
+.neo-upload { min-height: 220px; }
+.neo-query textarea { min-height: 174px; }
+.neo-gallery { min-height: clamp(300px, 46dvh, 620px); height: auto; }
+#neo-answer { min-height: 180px; max-height: 520px; overflow-y: auto; }
+.neo-answer textarea { min-height: 180px; max-height: 520px; }
 
-/* The pages and the answer take whatever height the window has left. Everything above them measures 712px at this
-   width, so subtracting that fills the screen exactly, and the floor keeps both usable on a short window where the
-   container scrolls instead. A definite height matters here: sized by flex-grow, the gallery's grid escapes its
-   column and lands on top of the answer. The answer sits under a 40px tab bar, so it gets 40px less than the
-   gallery and the two columns still end level. */
-.neo-gallery { height: clamp(150px, calc(100dvh - 712px), 700px); }
-#neo-answer,
-.neo-answer textarea { height: clamp(110px, calc(100dvh - 752px), 660px); }
-#neo-answer { overflow-y: auto; }
-/* Past 1600px the "How it works" paragraph wraps to two lines instead of three, freeing 22px. */
-@media (min-width: 1600px) {
-  .neo-gallery { height: clamp(150px, calc(100dvh - 690px), 700px); }
-  #neo-answer,
-  .neo-answer textarea { height: clamp(110px, calc(100dvh - 730px), 660px); }
-}
-/* One line of example buttons rather than three wrapped ones, and one line of scoring options. */
-.neo-examples { flex-wrap: nowrap; gap: 6px; }
-/* min-width lets the three buttons share the column instead of overflowing it, since nowrap otherwise pins each
-   one to its text width. */
+/* Examples wrap instead of truncating, so every question remains readable and tappable. */
+.neo-examples { flex-wrap: wrap; gap: 8px; }
 .neo-examples button {
-  white-space: nowrap;
-  font-size: 0.8rem;
-  padding-left: 6px;
-  padding-right: 6px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1 1 150px;
+  min-height: 44px;
+  white-space: normal;
+  font-size: 0.82rem;
+  line-height: 1.2;
 }
 .neo-step h2 + * { margin-top: 0; }
-/* Hints belong to the control right above them, so they get no padding of their own and almost no margin. */
-.neo-hint { color: var(--neo-ink-mid); font-size: 0.9rem; font-style: italic; margin: -4px 0 0; padding: 0; }
+/* Hints are explanatory prose. Italics are reserved for emphasis inside that prose. */
+.neo-hint { color: var(--neo-ink-mid); font-size: 0.9rem; line-height: 1.45; margin: -2px 0 0; padding: 0; }
+.neo-hint p { margin: 0; }
 
 /* Primary action buttons get the confident accent; keep the label calm. */
 .gradio-container button.primary,
 .gradio-container .gr-button-primary { font-weight: 600; letter-spacing: 0.01em; }
+.gradio-container button { min-height: 44px; }
 
-/* Answer panel — moss-tinted like the "streamed/good" path in the source. */
-#neo-answer textarea {
+/* The answer is optional and gains its own restrained color only after retrieval. */
+.neo-answer-panel { margin-top: 14px; }
+#neo-answer,
+.neo-answer textarea {
   background: color-mix(in oklch, var(--neo-accent-2) 6%, var(--neo-panel));
   border-color: color-mix(in oklch, var(--neo-accent-2) 22%, var(--neo-line));
   font-size: 1rem;
   line-height: 1.6;
+}
+
+/* Keyboard focus must remain visible after reskinning Gradio controls. */
+.gradio-container :is(a, button, input, textarea, [role="radio"], [role="slider"]):focus-visible {
+  outline: 2px solid var(--neo-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .contain > .column { gap: 14px; padding-inline: 12px; }
+  .neo-workspace { flex-direction: column; gap: 24px; }
+  .neo-upload { min-height: 180px; }
+  .neo-query textarea { min-height: 140px; }
+  .neo-gallery { min-height: 280px; }
+  .neo-examples button { flex-basis: 100%; }
 }
 
 footer { display: none !important; }

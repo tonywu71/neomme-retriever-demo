@@ -21,6 +21,7 @@ NEOMME_MAX_SIDE (px, default 2048 = the ViDoRe eval), NEOMME_PAGE_BATCH, NEOMME_
 
 import base64
 import os
+import time
 from dataclasses import dataclass, field
 
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")  # a few ops MPS lacks must fall back to CPU
@@ -222,7 +223,7 @@ def _index(pages: list[tuple[str, Image.Image]], retriever: str) -> tuple[Corpus
     grids, pooled = _encode_documents([image for _, image in pages], retriever)
     corpus = Corpus(pages=pages, doc_embeds=grids, dense_embeds=pooled, retriever=retriever)
     label = _RETRIEVER_SPECS[retriever].label
-    return corpus, f"✓ Indexed {len(pages)} pages with NeoMME {label}, late interaction and dense. Ready to search."
+    return corpus, f"Indexed {len(pages)} pages with NeoMME {label}. Ready to retrieve."
 
 
 def add_sample(files) -> list[str]:
@@ -236,21 +237,77 @@ def add_sample(files) -> list[str]:
     return paths
 
 
-def build_index(files, retriever: str) -> tuple[Corpus, str]:
-    """Make the corpus match the file list exactly, so clearing the uploader and re-indexing empties it.
+def invalidate_index(files, retriever: str):
+    """Clear embeddings and results whenever the selected files or retriever change."""
+    label = _RETRIEVER_SPECS[retriever].label
+    if files:
+        status = f"Files changed. Index them with NeoMME {label} before retrieving."
+    else:
+        status = "No documents indexed yet."
+    return (
+        Corpus(),
+        [],
+        status,
+        gr.update(variant="primary"),
+        gr.update(interactive=False, variant="secondary"),
+        [],
+        "Index a document to see ranked pages.",
+        gr.update(interactive=False),
+        "",
+        "",
+    )
+
+
+def build_index(files, retriever: str, progress=gr.Progress()):
+    """Make the corpus match the file list exactly and update the active workflow state.
 
     The alternative, leaving the previous corpus in place, is worse than it sounds: the pages panel and the
     file list would disagree about what a search is actually searching.
     """
     if not files:
-        return Corpus(), "*Corpus cleared. Upload PDFs or images, then index them.*"
-    return _index(_pages_from_files([str(file) for file in files]), retriever)
+        raise gr.Error("Upload a PDF or image before indexing.")
+    try:
+        progress(0.05, desc="Preparing pages")
+        pages = _pages_from_files([str(file) for file in files])
+        progress(0.2, desc=f"Encoding {len(pages)} pages")
+        corpus, status = _index(pages, retriever)
+        progress(1.0, desc="Index ready")
+    except Exception as error:
+        print(f"[index] {type(error).__name__}: {error}")
+        return (
+            Corpus(),
+            [],
+            "Indexing failed. Check the uploaded files and try again.",
+            gr.update(variant="primary"),
+            gr.update(interactive=False, variant="secondary"),
+            [],
+            "No ranked pages yet.",
+            gr.update(interactive=False),
+            "",
+            "",
+        )
+    return (
+        corpus,
+        [],
+        status,
+        gr.update(variant="secondary"),
+        gr.update(interactive=True, variant="primary"),
+        [],
+        "Enter a query, then retrieve pages.",
+        gr.update(interactive=False),
+        "",
+        "",
+    )
 
 
-def reset_index(retriever: str) -> tuple[Corpus, str, list, str, str]:
-    """Changing model size invalidates every stored embedding, so require a fresh index."""
-    label = _RETRIEVER_SPECS[retriever].label
-    return Corpus(), f"*NeoMME {label} selected. Index the documents with this model.*", [], "", ""
+def clear_results(corpus: Corpus):
+    """Keep the index but clear results that no longer match the retrieval settings."""
+    status = (
+        "Retrieval settings changed. Retrieve again."
+        if corpus and corpus.doc_embeds
+        else "Index a document to see ranked pages."
+    )
+    return [], [], status, gr.update(interactive=False), "", ""
 
 
 def _retrieve(query: str, top_k: int, scoring: str, corpus: Corpus) -> list[tuple[str, Image.Image]]:
@@ -267,37 +324,49 @@ _BIBTEX = """@software{neomme2026,
 }"""
 
 _NO_KEY_NOTE = (
-    "*The ranked pages are on the left. This provider needs a key, so either switch back to the Local VLM "
-    "or paste a key under **Generate an answer**.*"
+    "The ranked pages are ready. This provider needs a key. Switch to the Local VLM or enter the provider key."
 )
 
 
-def search(
+def retrieve_pages(
     query: str,
     top_k: int,
     scoring: str,
     retriever: str,
-    provider: str,
-    api_key: str,
-    model: str,
     corpus: Corpus,
 ):
     if not corpus or not corpus.doc_embeds:
-        return [], "Build the index first.", "Build the index first."
+        raise gr.Error("Index the documents before retrieving.")
     if corpus.retriever != retriever:
-        message = "The model size changed. Index the documents again before searching."
-        return [], message, message
+        raise gr.Error("The model size changed. Index the documents again.")
     if not query.strip():
-        return [], "Enter a query.", "Enter a query."
+        raise gr.Error("Enter a query before retrieving.")
+    started = time.perf_counter()
     ranked = _retrieve(query, top_k, scoring, corpus)
     gallery = [(image, label) for label, image in ranked]
+    elapsed = time.perf_counter() - started
+    label = _RETRIEVER_SPECS[retriever].label
+    status = f"Retrieved {len(ranked)} pages with NeoMME {label}, {scoring}, in {elapsed:.2f}s."
+    return ranked, gallery, status, gr.update(interactive=True), "", ""
+
+
+def generate_answer_from_pages(
+    query: str,
+    provider: str,
+    api_key: str,
+    model: str,
+    ranked: list[tuple[str, Image.Image]],
+):
+    if not ranked:
+        raise gr.Error("Retrieve pages before generating an answer.")
     if PROVIDERS[provider].needs_key and not api_key.strip():  # skip cleanly rather than erroring
-        return gallery, _NO_KEY_NOTE, _NO_KEY_NOTE
+        return _NO_KEY_NOTE, _NO_KEY_NOTE
     try:
         answer = generate_answer(provider, api_key, model, query, ranked)
     except Exception as error:  # surface provider/auth errors in the answer box, keep the pages visible
-        answer = f"⚠️ {type(error).__name__}: {error}"
-    return gallery, answer, answer  # same text feeds the rendered-markdown and raw views
+        print(f"[answer] {type(error).__name__}: {error}")
+        raise gr.Error("Answer generation failed. Check the provider settings and try again.") from error
+    return answer, answer  # same text feeds the rendered-markdown and raw views
 
 
 def _on_provider_change(provider: str):
@@ -325,71 +394,91 @@ _HERO = f"""
 """
 
 _ABOUT = """
-NeoMME encodes each page as a grid of token vectors and scores a query against them with MaxSim, the
-ColBERT-style late-interaction objective. Retrieval reads the *rendered* page, so there is no OCR step.
-The retrieved pages are then fed to a vision-language model, which defaults to a small one running on
-this Space. Index again whenever you change documents or model size.
+Upload a document, ask a question, and inspect the ranked pages. NeoMME reads the *rendered* page directly,
+without an OCR step.
 """
 
 
 def _demo():
     with gr.Blocks(title="NeoMME document retrieval") as demo:  # theme/css passed at launch (Gradio 6)
         gr.HTML(_HERO)
-        gr.Markdown(f"### How it works\n\n{_ABOUT}", elem_classes="neo-about")
+        gr.Markdown(_ABOUT, elem_classes="neo-about")
 
-        # Inputs: Upload | Query | Generate-answer, each column owning the button that acts on it: Index under
-        # the uploader, Submit under the provider controls. min_width => clean wrap on a narrow viewport.
-        with gr.Row(equal_height=True, elem_classes="neo-controls"):
-            with gr.Column(scale=2, min_width=220):
-                gr.Markdown("## 1. Upload", elem_classes="neo-step")
-                retriever = gr.Radio(
-                    choices=_RETRIEVER_CHOICES,
-                    value=_DEFAULT_RETRIEVER,
-                    label="Retriever",
-                    elem_classes="neo-retriever",
-                )
-                gr.HTML(_RETRIEVER_LINKS)
+        with gr.Accordion("Retrieval settings", open=False, elem_classes="neo-settings"):
+            with gr.Row():
+                with gr.Column(scale=2, min_width=260):
+                    retriever = gr.Radio(
+                        choices=_RETRIEVER_CHOICES,
+                        value=_DEFAULT_RETRIEVER,
+                        label="Retriever",
+                        elem_classes="neo-retriever",
+                    )
+                    gr.HTML(_RETRIEVER_LINKS)
+                top_k = gr.Slider(1, 10, value=3, step=1, label="Pages to retrieve", scale=1)
+                scoring = gr.Radio(list(_SCORINGS), value=_MAXSIM, label="Scoring", scale=1)
+
+        with gr.Row(equal_height=True, elem_classes="neo-workspace"):
+            with gr.Column(scale=2, min_width=300, elem_classes="neo-index-panel"):
+                gr.Markdown("## 1. Build the index", elem_classes="neo-step")
                 files = gr.File(
                     file_count="multiple",
                     file_types=[".pdf", "image"],
                     label="PDFs / images",
-                    height=210,
+                    height=220,
                     elem_classes="neo-upload",
                 )
                 gr.Markdown(
-                    "*No PDF? Add the sample, then index it.*",
+                    "No document ready? Try the sample paper.",
                     elem_classes="neo-hint",
                     visible=os.path.isfile(_SAMPLE_PDF),
                 )
                 sample_btn = gr.Button(
-                    "📄  Add the ColPali paper (10 pages)",
+                    "Try the ColPali paper (10 pages)",
                     size="sm",
                     variant="secondary",
                     visible=os.path.isfile(_SAMPLE_PDF),
                 )
                 build_btn = gr.Button("Index documents", variant="primary", size="sm")
-                status = gr.Markdown("*No documents indexed yet.*", elem_classes="neo-status")
-            with gr.Column(scale=3, min_width=240):
-                gr.Markdown("## 2. Ask", elem_classes="neo-step")
-                query = gr.Textbox(
-                    label="Query", placeholder="What does the report say about …?", lines=4, elem_classes="neo-query"
+                status = gr.Markdown(
+                    "No documents indexed yet.", elem_classes="neo-status", elem_id="neo-index-status"
                 )
-                gr.Markdown("*Click an example to fill the query box.*", elem_classes="neo-hint")
+            with gr.Column(scale=3, min_width=340, elem_classes="neo-query-panel"):
+                gr.Markdown("## 2. Search the document", elem_classes="neo-step")
+                query = gr.Textbox(
+                    label="Query", placeholder="What does the report say about …?", lines=5, elem_classes="neo-query"
+                )
+                gr.Markdown("Questions for the sample paper:", elem_classes="neo-hint")
                 with gr.Row(elem_classes="neo-examples"):
                     for label, example in _EXAMPLE_QUERIES:
                         # default argument, or every button would close over the last loop value
                         gr.Button(label, size="sm", variant="secondary").click(lambda text=example: text, None, query)
-                with gr.Row():  # side by side, so the control band stays as short as column 3
-                    top_k = gr.Slider(1, 10, value=3, step=1, label="Pages to retrieve")
-                    scoring = gr.Radio(list(_SCORINGS), value=_MAXSIM, label="Scoring")
-            with gr.Column(scale=3, min_width=240):
-                gr.Markdown("## 3. Generate an answer", elem_classes="neo-step")
-                gr.Markdown(
-                    "*The default model runs on this Space, so no key is needed.*",
-                    elem_classes="neo-hint",
+                retrieve_btn = gr.Button("Retrieve pages", variant="secondary", interactive=False)
+                retrieval_status = gr.Markdown(
+                    "Index a document to see ranked pages.",
+                    elem_classes=["neo-status", "neo-run-meta"],
+                    elem_id="neo-retrieval-status",
                 )
-                provider = gr.Dropdown(choices=list(PROVIDERS), value=LOCAL_PROVIDER, label="Provider")
-                with gr.Row():  # side by side, so the column ends near the other two
+
+        gr.Markdown("## 3. Ranked pages", elem_classes="neo-step neo-results-heading")
+        gallery = gr.Gallery(
+            label="Ranked pages",
+            columns=3,
+            object_fit="contain",
+            elem_classes="neo-gallery",
+        )
+
+        with gr.Accordion(
+            "Optional answer from the retrieved pages", open=False, elem_classes="neo-answer-panel"
+        ):
+            gr.Markdown(
+                "Generate a grounded answer after checking the ranked pages. The default model runs on this Space.",
+                elem_classes="neo-hint",
+            )
+            with gr.Row():
+                provider = gr.Dropdown(
+                    choices=list(PROVIDERS), value=LOCAL_PROVIDER, label="Provider", scale=1
+                )
+                with gr.Column(scale=2):
                     model = gr.Textbox(
                         label="Model",
                         value=PROVIDERS[LOCAL_PROVIDER].default_model,
@@ -402,22 +491,16 @@ def _demo():
                         placeholder=PROVIDERS[LOCAL_PROVIDER].key_hint,
                         interactive=PROVIDERS[LOCAL_PROVIDER].needs_key,
                     )
-                search_btn = gr.Button("Submit", variant="primary", size="sm")
-
-        with gr.Row(equal_height=False):
-            with gr.Column(scale=3, min_width=320):
-                gr.Markdown("## 4. Retrieved pages", elem_classes="neo-step")
-                # Height comes from the CSS, which scales it with the window instead of pinning it.
-                gallery = gr.Gallery(label="Ranked pages", columns=3, object_fit="contain", elem_classes="neo-gallery")
-            with gr.Column(scale=2, min_width=280):
-                gr.Markdown("## 5. Answer", elem_classes="neo-step")
-                with gr.Tabs():  # markdown-rendered by default; raw for copy/inspection
-                    with gr.Tab("Rendered"):
-                        answer_md = gr.Markdown(elem_id="neo-answer")
-                    with gr.Tab("Raw"):
-                        answer_raw = gr.Textbox(
-                            label="Raw answer", lines=10, interactive=False, elem_classes="neo-answer"
-                        )
+            answer_btn = gr.Button(
+                "Generate answer from these pages", variant="primary", interactive=False
+            )
+            with gr.Tabs():
+                with gr.Tab("Rendered"):
+                    answer_md = gr.Markdown(elem_id="neo-answer")
+                with gr.Tab("Raw"):
+                    answer_raw = gr.Textbox(
+                        label="Raw answer", lines=10, interactive=False, elem_classes="neo-answer"
+                    )
 
         # Collapsed, because nobody needs the BibTeX on arrival and an open block costs the page a screenful.
         with gr.Accordion("Cite", open=False):
@@ -425,14 +508,38 @@ def _demo():
 
         # Per-session corpus: a Space serves many visitors from one process, so this must never be global.
         corpus = gr.State(Corpus())
+        ranked = gr.State([])
 
         provider.change(_on_provider_change, [provider], [api_key, model])
-        retriever.change(reset_index, [retriever], [corpus, status, gallery, answer_md, answer_raw])
-        build_btn.click(build_index, [files, retriever], [corpus, status])
-        search_btn.click(
-            search,
-            [query, top_k, scoring, retriever, provider, api_key, model, corpus],
-            [gallery, answer_md, answer_raw],
+        invalidation_outputs = [
+            corpus,
+            ranked,
+            status,
+            build_btn,
+            retrieve_btn,
+            gallery,
+            retrieval_status,
+            answer_btn,
+            answer_md,
+            answer_raw,
+        ]
+        files.change(invalidate_index, [files, retriever], invalidation_outputs)
+        retriever.change(invalidate_index, [files, retriever], invalidation_outputs)
+        build_btn.click(build_index, [files, retriever], invalidation_outputs)
+
+        result_outputs = [ranked, gallery, retrieval_status, answer_btn, answer_md, answer_raw]
+        retrieve_inputs = [query, top_k, scoring, retriever, corpus]
+        retrieve_btn.click(retrieve_pages, retrieve_inputs, result_outputs)
+        query.submit(retrieve_pages, retrieve_inputs, result_outputs)
+
+        stale_result_outputs = [ranked, gallery, retrieval_status, answer_btn, answer_md, answer_raw]
+        scoring.change(clear_results, [corpus], stale_result_outputs)
+        top_k.release(clear_results, [corpus], stale_result_outputs)
+
+        answer_btn.click(
+            generate_answer_from_pages,
+            [query, provider, api_key, model, ranked],
+            [answer_md, answer_raw],
         )
         sample_btn.click(add_sample, files, files)
     return demo
