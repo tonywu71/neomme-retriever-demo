@@ -9,7 +9,7 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 license: apache-2.0
-short_description: Late-interaction visual document retrieval (NeoMME 250M and 800M)
+short_description: Visual retrieval with NeoMME 250M and 800M
 startup_duration_timeout: 1h
 ---
 
