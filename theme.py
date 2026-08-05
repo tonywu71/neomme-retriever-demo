@@ -126,11 +126,54 @@ html, body { height: 100%; }
 
 /* The setup is a real two-step sequence. Settings stay available without competing with the task. */
 .neo-settings { margin: 4px 0 10px; }
-.neo-settings > .label-wrap {
+.neo-settings > .label-wrap,
+.neo-cite > .label-wrap {
   color: var(--neo-ink-mid);
   font-family: var(--neo-font-display);
   font-size: 0.88rem;
   font-weight: 600;
+}
+/* Gradio uses a rotating black triangle for accordions. Replace it with a quiet plus/minus control. */
+.block.gr-accordion.neo-settings > button.label-wrap .icon,
+.block.gr-accordion.neo-cite > button.label-wrap .icon {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 0;
+  transform: none !important;
+}
+.block.gr-accordion.neo-settings > button.label-wrap .icon::before,
+.block.gr-accordion.neo-settings > button.label-wrap .icon::after,
+.block.gr-accordion.neo-cite > button.label-wrap .icon::before,
+.block.gr-accordion.neo-cite > button.label-wrap .icon::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.block.gr-accordion.neo-settings > button.label-wrap .icon::before,
+.block.gr-accordion.neo-cite > button.label-wrap .icon::before {
+  width: 10px;
+  height: 1.5px;
+}
+.block.gr-accordion.neo-settings > button.label-wrap .icon::after,
+.block.gr-accordion.neo-cite > button.label-wrap .icon::after {
+  width: 1.5px;
+  height: 10px;
+}
+.block.gr-accordion.neo-settings > button.label-wrap.open .icon::after,
+.block.gr-accordion.neo-cite > button.label-wrap.open .icon::after {
+  opacity: 0;
+  transform: rotate(90deg);
+}
+.neo-settings > .label-wrap:focus-visible,
+.neo-cite > .label-wrap:focus-visible {
+  outline: 1px solid color-mix(in oklch, var(--neo-accent) 62%, var(--neo-line));
+  outline-offset: 1px;
 }
 .neo-workspace { align-items: stretch; gap: clamp(20px, 3vw, 40px); }
 .neo-workspace > .column { justify-content: flex-start; gap: 10px; min-width: 0; }
@@ -196,8 +239,9 @@ html, body { height: 100%; }
 .gradio-container .gr-button-primary { font-weight: 600; letter-spacing: 0.01em; }
 .gradio-container button { min-height: 44px; }
 
-/* The answer is optional and gains its own restrained color only after retrieval. */
-.neo-answer-panel { margin-top: 14px; }
+/* The answer section gains its own restrained color only after retrieval. */
+.neo-answer-heading { margin-top: 16px; }
+.neo-answer-section { gap: 10px; }
 #neo-answer,
 .neo-answer textarea {
   background: color-mix(in oklch, var(--neo-accent-2) 6%, var(--neo-panel));

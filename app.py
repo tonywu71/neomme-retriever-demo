@@ -467,9 +467,11 @@ def _demo():
             elem_classes="neo-gallery",
         )
 
-        with gr.Accordion(
-            "Optional answer from the retrieved pages", open=False, elem_classes="neo-answer-panel"
-        ):
+        gr.Markdown(
+            "## 4. Answer from the ranked pages",
+            elem_classes=["neo-step", "neo-answer-heading"],
+        )
+        with gr.Column(elem_classes="neo-answer-section"):
             gr.Markdown(
                 "Generate a grounded answer after checking the ranked pages. The default model runs on this Space.",
                 elem_classes="neo-hint",
@@ -503,7 +505,7 @@ def _demo():
                     )
 
         # Collapsed, because nobody needs the BibTeX on arrival and an open block costs the page a screenful.
-        with gr.Accordion("Cite", open=False):
+        with gr.Accordion("Cite", open=False, elem_classes="neo-cite"):
             gr.Code(value=_BIBTEX, language=None, label="BibTeX (click to copy)", wrap_lines=False)
 
         # Per-session corpus: a Space serves many visitors from one process, so this must never be global.

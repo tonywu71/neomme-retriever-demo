@@ -32,9 +32,9 @@ The same forward pass also produces one pooled vector per page, so the app index
 can switch scoring under the collapsed retrieval settings. MaxSim is the default, and it is the only scoring the
 published retrieval numbers cover, so treat the dense option as a comparison rather than a supported mode.
 
-Retrieval shows the ranked pages before doing anything else. A visitor can then open the optional answer section
-and ask a small vision language model on the Space to write an answer from those pages, with no API key. OpenAI,
-Anthropic and Gemini are also available. A visitor's key is used for that one request and is never stored.
+Retrieval shows the ranked pages before doing anything else. The answer section can then ask a small vision
+language model on the Space to write an answer from those pages, with no API key. OpenAI, Anthropic and Gemini
+are also available. A visitor's key is used for that one request and is never stored.
 
 The app depends on `transformers` alone, through `NeoMMEForRetrieval` and `NeoMMEProcessor`. The research `neomme`
 package is deliberately not a dependency, so the app also shows that the published model works the way anyone
