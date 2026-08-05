@@ -3,7 +3,7 @@
 # `gradio`, `spaces` and `huggingface_hub` are deliberately absent: the Spaces runtime preinstalls and manages
 # them, and pinning them here either fails to resolve or breaks the ZeroGPU hijack.
 torch                       # unpinned on purpose: the runtime preinstalls a version ZeroGPU accepts (2.8.0, 2.9.1, 2.10.0, 2.11.0)
-torchvision                 # not preinstalled; the answer VLM's image processor is torchvision-only (NeoMME's own is PIL)
+torchvision                 # not preinstalled; both NeoMME and the answer VLM use torchvision image processors
 pypdfium2>=4.0              # PDF page rasterization
 numpy>=2.0
 pillow>=10.0

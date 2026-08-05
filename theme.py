@@ -129,6 +129,23 @@ html, body { height: 100%; }
 .neo-status { color: var(--neo-ink-mid); font-size: 0.92rem; margin: 2px 0 0; }
 .neo-step h2 { margin: 4px 0 8px; }
 .neo-step h3 { margin: 4px 0 6px; }
+.neo-model-links {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: -5px 0 0;
+  color: var(--neo-ink-dim);
+  font-family: var(--neo-font-display);
+  font-size: 0.78rem;
+}
+.neo-model-links a {
+  color: var(--neo-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.neo-model-links a:hover { color: color-mix(in oklch, var(--neo-accent) 78%, var(--neo-ink)); }
 
 /* "How it works" is always open above the columns. h3 has no size rule of its own and would otherwise inherit
    a browser default LARGER than the 1.15rem column headings, so pin it just below them. */

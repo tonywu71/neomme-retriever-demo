@@ -9,7 +9,7 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 license: apache-2.0
-short_description: Late-interaction visual document retrieval (NeoMME 256M)
+short_description: Late-interaction visual document retrieval (NeoMME 250M and 800M)
 startup_duration_timeout: 1h
 ---
 
@@ -23,6 +23,10 @@ ranked highest.
 Every PDF page is converted into an image, because NeoMME reads a page as pixels instead of as extracted text.
 The model encodes each page image into a grid of token vectors, a few pages per forward pass, and it scores your
 query against those grids with MaxSim. Scoring runs inside the app, so there is no separate index server.
+
+Choose NeoMME 250M or 800M before indexing. The 250M model was trained for dense widths 128, 256, 512 and 1024.
+The 800M model adds the full 1792 width. Changing the model clears the index because embeddings from different
+checkpoints cannot be compared.
 
 The same forward pass also produces one pooled vector per page, so the app indexes both representations and you
 can switch scoring under the query box. MaxSim is the default, and it is the only scoring the published retrieval
@@ -43,8 +47,10 @@ These settings live on the Space rather than in git, so a rebuild from scratch d
 | Setting | Value | Why |
 | --- | --- | --- |
 | Hardware | `zero-a10g` | the app is written for ZeroGPU, with `import spaces` before torch, `@spaces.GPU` on encode, score and generate, and the models placed on cuda at import |
-| Secret `HF_TOKEN` | a read token for the `Hcompany` org | the checkpoint in `NEOMME_RELEASE` is private |
-| Variable `NEOMME_RELEASE` | `Hcompany/neomme-250M-retrieval-dev-transformers-v0.3` | which checkpoint to serve |
+| Secret `HF_TOKEN` | a read token for the `Hcompany` org | both retrieval checkpoints are private |
+| Variable `NEOMME_RELEASE_250M` | `Hcompany/neomme-250M-retriever-transformers-v1.0` | optional override for the published 250M checkpoint |
+| Variable `NEOMME_RELEASE_800M` | `Hcompany/neomme-800M-retriever-transformers-v1.0` | optional override for the published 800M checkpoint |
+| Variable `NEOMME_MODEL_SIZE` | `250m` | which radio option is selected when the app opens |
 | Variable `GRADIO_SSR_MODE` | `false` | required for correct styling, because Gradio's server side rendering puts the app's CSS in the page before its own component stylesheets, which then override it. With rendering off, the CSS is applied last, as it is locally |
 
 Hardware cannot be set from this repo. The `hardware:` key in the front matter above is ignored, so use the
@@ -86,8 +92,8 @@ VIRTUAL_ENV=.venv-space uv pip install -r requirements-local.txt
 `requirements.txt` is the build file for the Space, and it leaves out `gradio` and `spaces` because the Spaces
 runtime installs both and pinning them breaks ZeroGPU. `requirements-local.txt` adds them back for local runs.
 
-`HF_TOKEN` has to be a token that can read the private checkpoint. On Apple silicon the app selects mps and
-bfloat16 and uses 1.43GB of memory, after downloading about 1.5GB of weights on the first launch. Only cpu falls
+`HF_TOKEN` has to be a token that can read both private checkpoints. The app loads both sizes once so different
+browser sessions can use different models safely. On Apple silicon it selects MPS and bfloat16. Only CPU falls
 back to float32.
 
 If the answer model fails to load, the app still starts and offers only the providers that need a key.
@@ -96,7 +102,9 @@ If the answer model fails to load, the app still starts and offers only the prov
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `NEOMME_RELEASE` | `Hcompany/neomme-250M-retrieval-dev-transformers-v0.3` | any repo the port can load |
+| `NEOMME_RELEASE_250M` | `Hcompany/neomme-250M-retriever-transformers-v1.0` | any compatible 250M repo the port can load |
+| `NEOMME_RELEASE_800M` | `Hcompany/neomme-800M-retriever-transformers-v1.0` | any compatible 800M repo the port can load |
+| `NEOMME_MODEL_SIZE` | `250m` | default model-size selection, either `250m` or `800m` |
 | `NEOMME_VLM_LOCAL` | `LiquidAI/LFM2.5-VL-450M` | leave empty to disable local answers, which also removes the need for torchvision |
 | `NEOMME_VLM_MAX_NEW_TOKENS` | 512 | how long an answer can be, and the main control on how long generation takes |
 | `NEOMME_MAX_SIDE` | 2048 | the longest side a page image is resized to, trading quality for speed. 2048 is the cap used in the ViDoRe evaluation |

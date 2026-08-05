@@ -15,8 +15,8 @@ ZeroGPU: the GPU-heavy work (encode + score) lives in @spaces.GPU functions, so 
 duration of those calls and released afterwards. The model is placed on cuda at import (ZeroGPU runs a CUDA
 emulation outside @spaces.GPU that permits this); off ZeroGPU it auto-selects mps/cpu and the decorator is a no-op.
 
-Env: NEOMME_RELEASE (HF repo id), NEOMME_MAX_SIDE (px, default 2048 = the ViDoRe eval), NEOMME_PAGE_BATCH,
-NEOMME_GPU_DURATION.
+Env: NEOMME_RELEASE_250M / NEOMME_RELEASE_800M (HF repo ids), NEOMME_MODEL_SIZE (default selection),
+NEOMME_MAX_SIDE (px, default 2048 = the ViDoRe eval), NEOMME_PAGE_BATCH, NEOMME_GPU_DURATION.
 """
 
 import base64
@@ -33,21 +33,88 @@ from theme import NEOMME_CSS, build_theme
 from transformers import NeoMMEForRetrieval, NeoMMEProcessor
 from vlm import LOCAL_PROVIDER, PROVIDERS, generate_answer
 
-_REPO = os.environ.get("NEOMME_RELEASE", "Hcompany/neomme-250M-retrieval-dev-transformers-v0.3")
 _MAX_SIDE = int(os.environ.get("NEOMME_MAX_SIDE", "2048"))  # longest-side px cap; 2048 matches the ViDoRe eval
 _PAGE_BATCH = int(os.environ.get("NEOMME_PAGE_BATCH", "4"))  # pages per forward; native resolution is memory-hungry
 _GPU_DURATION = int(os.environ.get("NEOMME_GPU_DURATION", "120"))  # per-call ZeroGPU budget (s) for encode
 _ZEROGPU = os.environ.get("SPACES_ZERO_GPU") == "true"
 
 # On ZeroGPU, load onto cuda at import (a real GPU exists only inside @spaces.GPU; a CUDA emulation covers this
-# module-level placement). Elsewhere, mps/cpu.
+# module-level placement). Elsewhere, mps/cpu. Both sizes stay loaded so one visitor cannot change the shared
+# process out from under another visitor who selected a different size.
 _DEVICE = "cuda" if _ZEROGPU else ("mps" if torch.backends.mps.is_available() else "cpu")
 # bf16 everywhere but cpu, which has no native bf16 kernels and emulates them: measured ~900x slower on a
 # 1024x1024 matmul. On mps bf16 is 6.7x FASTER than fp32 and halves the resident weights.
 _DTYPE = torch.float32 if _DEVICE == "cpu" else torch.bfloat16
 
-processor = NeoMMEProcessor.from_pretrained(_REPO)
-model = NeoMMEForRetrieval.from_pretrained(_REPO, dtype=_DTYPE).to(_DEVICE).eval()
+
+@dataclass(frozen=True)
+class RetrieverSpec:
+    """One published NeoMME size and the dense widths used during its Matryoshka training."""
+
+    label: str
+    repo: str
+    dense_dims: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class Retriever:
+    """A loaded processor and model, kept together so their checkpoints cannot be mixed."""
+
+    spec: RetrieverSpec
+    processor: NeoMMEProcessor
+    model: NeoMMEForRetrieval
+
+
+_RETRIEVER_SPECS = {
+    "250m": RetrieverSpec(
+        label="250M",
+        repo=os.environ.get("NEOMME_RELEASE_250M", "Hcompany/neomme-250M-retriever-transformers-v1.0"),
+        dense_dims=(128, 256, 512, 1024),
+    ),
+    "800m": RetrieverSpec(
+        label="800M",
+        repo=os.environ.get("NEOMME_RELEASE_800M", "Hcompany/neomme-800M-retriever-transformers-v1.0"),
+        dense_dims=(128, 256, 512, 1024, 1792),
+    ),
+}
+_DEFAULT_RETRIEVER = os.environ.get("NEOMME_MODEL_SIZE", "250m").lower()
+if _DEFAULT_RETRIEVER not in _RETRIEVER_SPECS:
+    raise ValueError(f"NEOMME_MODEL_SIZE must be one of {sorted(_RETRIEVER_SPECS)}, got {_DEFAULT_RETRIEVER!r}")
+
+
+def _load_retriever(spec: RetrieverSpec) -> Retriever:
+    processor = NeoMMEProcessor.from_pretrained(spec.repo)
+    model, loading_info = NeoMMEForRetrieval.from_pretrained(
+        spec.repo, dtype=_DTYPE, output_loading_info=True
+    )
+    problems = {
+        key: values
+        for key in ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs")
+        if (values := loading_info.get(key))
+    }
+    if problems:
+        raise RuntimeError(
+            f"{spec.repo} is not a compatible Transformers-format NeoMME checkpoint: {problems}"
+        )
+    model = model.to(_DEVICE).eval()
+    return Retriever(spec=spec, processor=processor, model=model)
+
+
+_RETRIEVERS = {key: _load_retriever(spec) for key, spec in _RETRIEVER_SPECS.items()}
+_RETRIEVER_CHOICES = [
+    (f"{spec.label}: {spec.dense_dims[-1]}d dense", key)
+    for key, spec in _RETRIEVER_SPECS.items()
+]
+_RETRIEVER_LINKS = """
+<div class="neo-model-links">
+  Model cards:
+  <a href="https://huggingface.co/Hcompany/neomme-250M-retriever-transformers-v1.0"
+     target="_blank" rel="noopener noreferrer">250M ↗</a>
+  <span>and</span>
+  <a href="https://huggingface.co/Hcompany/neomme-800M-retriever-transformers-v1.0"
+     target="_blank" rel="noopener noreferrer">800M ↗</a>
+</div>
+"""
 
 
 # A document to try the demo with. Clicking it puts the file in the UPLOADER rather than straight into the
@@ -82,6 +149,7 @@ class Corpus:
     pages: list[tuple[str, Image.Image]] = field(default_factory=list)
     doc_embeds: list[torch.Tensor] = field(default_factory=list)  # per-page multivector grids, on the CPU
     dense_embeds: torch.Tensor = field(default_factory=lambda: torch.empty(0))  # (n_pages, dense_dim), on the CPU
+    retriever: str | None = None
 
 
 def _pdf_to_images(path: str, dpi: int = 150) -> list[Image.Image]:
@@ -108,7 +176,7 @@ def _pages_from_files(paths: list[str]) -> list[tuple[str, Image.Image]]:
 
 
 @spaces.GPU(duration=_GPU_DURATION)
-def _encode_documents(images: list[Image.Image]) -> tuple[list[torch.Tensor], torch.Tensor]:
+def _encode_documents(images: list[Image.Image], retriever: str) -> tuple[list[torch.Tensor], torch.Tensor]:
     """Page images -> one (n_tokens, embedding_dim) grid per page plus one pooled vector per page, on the CPU.
 
     Both come out of the same forward, so keeping both costs one extra vector per page.
@@ -116,12 +184,13 @@ def _encode_documents(images: list[Image.Image]) -> tuple[list[torch.Tensor], to
     The grids are trimmed to each page's real tokens: the head zeroes padding rows, but a ragged list is what
     `score_retrieval` wants and it keeps a long page from padding every short one in the batch.
     """
+    bundle = _RETRIEVERS[retriever]
     grids: list[torch.Tensor] = []
     pooled: list[torch.Tensor] = []
     for start in range(0, len(images), _PAGE_BATCH):
-        batch = processor(images=images[start : start + _PAGE_BATCH], max_side=_MAX_SIDE).to(_DEVICE)
+        batch = bundle.processor(images=images[start : start + _PAGE_BATCH], max_side=_MAX_SIDE).to(_DEVICE)
         with torch.no_grad():
-            output = model(**batch)
+            output = bundle.model(**batch)
         embeddings = output.multivector_embeddings.float().cpu()
         pooled.append(output.dense_embeddings.float().cpu())
         lengths = batch["attention_mask"].sum(dim=-1).tolist()
@@ -135,21 +204,25 @@ def _score(query: str, corpus: Corpus, scoring: str) -> list[float]:
 
     Both heads L2-normalize their output, so the dense dot product below is already a cosine.
     """
-    inputs = processor(text=[query], text_role="query").to(_DEVICE)
+    if corpus.retriever is None:
+        raise ValueError("The corpus has no model size. Index the documents again.")
+    bundle = _RETRIEVERS[corpus.retriever]
+    inputs = bundle.processor(text=[query], text_role="query").to(_DEVICE)
     with torch.no_grad():
-        output = model(**inputs)
+        output = bundle.model(**inputs)
     if scoring == _DENSE:
         query_dense = output.dense_embeddings.float().cpu()
         return (query_dense @ corpus.dense_embeds.T)[0].tolist()
     query_multivector = output.multivector_embeddings.float().cpu()
-    return processor.score_retrieval(query_multivector, corpus.doc_embeds)[0].tolist()
+    return bundle.processor.score_retrieval(query_multivector, corpus.doc_embeds)[0].tolist()
 
 
-def _index(pages: list[tuple[str, Image.Image]]) -> tuple[Corpus, str]:
+def _index(pages: list[tuple[str, Image.Image]], retriever: str) -> tuple[Corpus, str]:
     """Encode `pages` into a fresh corpus for this session, and the status line that reports it."""
-    grids, pooled = _encode_documents([image for _, image in pages])
-    corpus = Corpus(pages=pages, doc_embeds=grids, dense_embeds=pooled)
-    return corpus, f"✓ Indexed {len(pages)} pages, late interaction and dense. Ready to search."
+    grids, pooled = _encode_documents([image for _, image in pages], retriever)
+    corpus = Corpus(pages=pages, doc_embeds=grids, dense_embeds=pooled, retriever=retriever)
+    label = _RETRIEVER_SPECS[retriever].label
+    return corpus, f"✓ Indexed {len(pages)} pages with NeoMME {label}, late interaction and dense. Ready to search."
 
 
 def add_sample(files) -> list[str]:
@@ -163,7 +236,7 @@ def add_sample(files) -> list[str]:
     return paths
 
 
-def build_index(files) -> tuple[Corpus, str]:
+def build_index(files, retriever: str) -> tuple[Corpus, str]:
     """Make the corpus match the file list exactly, so clearing the uploader and re-indexing empties it.
 
     The alternative, leaving the previous corpus in place, is worse than it sounds: the pages panel and the
@@ -171,7 +244,13 @@ def build_index(files) -> tuple[Corpus, str]:
     """
     if not files:
         return Corpus(), "*Corpus cleared. Upload PDFs or images, then index them.*"
-    return _index(_pages_from_files([str(file) for file in files]))
+    return _index(_pages_from_files([str(file) for file in files]), retriever)
+
+
+def reset_index(retriever: str) -> tuple[Corpus, str, list, str, str]:
+    """Changing model size invalidates every stored embedding, so require a fresh index."""
+    label = _RETRIEVER_SPECS[retriever].label
+    return Corpus(), f"*NeoMME {label} selected. Index the documents with this model.*", [], "", ""
 
 
 def _retrieve(query: str, top_k: int, scoring: str, corpus: Corpus) -> list[tuple[str, Image.Image]]:
@@ -193,9 +272,21 @@ _NO_KEY_NOTE = (
 )
 
 
-def search(query: str, top_k: int, scoring: str, provider: str, api_key: str, model: str, corpus: Corpus):
+def search(
+    query: str,
+    top_k: int,
+    scoring: str,
+    retriever: str,
+    provider: str,
+    api_key: str,
+    model: str,
+    corpus: Corpus,
+):
     if not corpus or not corpus.doc_embeds:
         return [], "Build the index first.", "Build the index first."
+    if corpus.retriever != retriever:
+        message = "The model size changed. Index the documents again before searching."
+        return [], message, message
     if not query.strip():
         return [], "Enter a query.", "Enter a query."
     ranked = _retrieve(query, top_k, scoring, corpus)
@@ -237,7 +328,7 @@ _ABOUT = """
 NeoMME encodes each page as a grid of token vectors and scores a query against them with MaxSim, the
 ColBERT-style late-interaction objective. Retrieval reads the *rendered* page, so there is no OCR step.
 The retrieved pages are then fed to a vision-language model, which defaults to a small one running on
-this Space. Index again whenever you change documents.
+this Space. Index again whenever you change documents or model size.
 """
 
 
@@ -251,6 +342,13 @@ def _demo():
         with gr.Row(equal_height=True, elem_classes="neo-controls"):
             with gr.Column(scale=2, min_width=220):
                 gr.Markdown("## 1. Upload", elem_classes="neo-step")
+                retriever = gr.Radio(
+                    choices=_RETRIEVER_CHOICES,
+                    value=_DEFAULT_RETRIEVER,
+                    label="Retriever",
+                    elem_classes="neo-retriever",
+                )
+                gr.HTML(_RETRIEVER_LINKS)
                 files = gr.File(
                     file_count="multiple",
                     file_types=[".pdf", "image"],
@@ -329,9 +427,12 @@ def _demo():
         corpus = gr.State(Corpus())
 
         provider.change(_on_provider_change, [provider], [api_key, model])
-        build_btn.click(build_index, [files], [corpus, status])
+        retriever.change(reset_index, [retriever], [corpus, status, gallery, answer_md, answer_raw])
+        build_btn.click(build_index, [files, retriever], [corpus, status])
         search_btn.click(
-            search, [query, top_k, scoring, provider, api_key, model, corpus], [gallery, answer_md, answer_raw]
+            search,
+            [query, top_k, scoring, retriever, provider, api_key, model, corpus],
+            [gallery, answer_md, answer_raw],
         )
         sample_btn.click(add_sample, files, files)
     return demo
