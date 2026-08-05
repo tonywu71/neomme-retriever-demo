@@ -192,13 +192,14 @@ html, body { height: 100%; }
 .neo-results-heading { margin-top: 12px; }
 .neo-model-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 5px;
+  gap: 10px;
   margin: -3px 0 0;
   color: var(--neo-ink-dim);
   font-family: var(--neo-font-display);
-  font-size: 0.82rem;
+  font-size: clamp(0.72rem, 1.15vw, 0.82rem);
+  white-space: nowrap;
 }
 .neo-model-links a {
   color: var(--neo-accent);
@@ -242,6 +243,7 @@ html, body { height: 100%; }
 /* The answer section gains its own restrained color only after retrieval. */
 .neo-answer-heading { margin-top: 16px; }
 .neo-answer-section { gap: 10px; }
+.neo-answer-controls { align-items: stretch; gap: 12px; }
 #neo-answer,
 .neo-answer textarea {
   background: color-mix(in oklch, var(--neo-accent-2) 6%, var(--neo-panel));
@@ -263,6 +265,8 @@ html, body { height: 100%; }
   .neo-query textarea { min-height: 140px; }
   .neo-gallery { min-height: 280px; }
   .neo-examples button { flex-basis: 100%; }
+  .neo-answer-controls { flex-direction: column; }
+  .neo-model-links { flex-wrap: wrap; white-space: normal; }
 }
 
 footer { display: none !important; }

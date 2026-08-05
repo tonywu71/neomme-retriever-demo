@@ -102,18 +102,14 @@ def _load_retriever(spec: RetrieverSpec) -> Retriever:
 
 
 _RETRIEVERS = {key: _load_retriever(spec) for key, spec in _RETRIEVER_SPECS.items()}
-_RETRIEVER_CHOICES = [
-    (f"{spec.label}: {spec.dense_dims[-1]}d dense", key)
-    for key, spec in _RETRIEVER_SPECS.items()
-]
+_RETRIEVER_CHOICES = [(f"neomme-retriever-{spec.label}", key) for key, spec in _RETRIEVER_SPECS.items()]
 _RETRIEVER_LINKS = """
 <div class="neo-model-links">
   Model cards:
   <a href="https://huggingface.co/Hcompany/neomme-250M-retriever-transformers-v1.0"
-     target="_blank" rel="noopener noreferrer">250M ↗</a>
-  <span>and</span>
+     target="_blank" rel="noopener noreferrer">🤗 Hcompany/neomme-retriever-250M</a>
   <a href="https://huggingface.co/Hcompany/neomme-800M-retriever-transformers-v1.0"
-     target="_blank" rel="noopener noreferrer">800M ↗</a>
+     target="_blank" rel="noopener noreferrer">🤗 Hcompany/neomme-retriever-800M</a>
 </div>
 """
 
@@ -404,7 +400,7 @@ def _demo():
         gr.HTML(_HERO)
         gr.Markdown(_ABOUT, elem_classes="neo-about")
 
-        with gr.Accordion("Retrieval settings", open=False, elem_classes="neo-settings"):
+        with gr.Accordion("⚙️ Retrieval settings", open=False, elem_classes="neo-settings"):
             with gr.Row():
                 with gr.Column(scale=2, min_width=260):
                     retriever = gr.Radio(
@@ -476,23 +472,30 @@ def _demo():
                 "Generate a grounded answer after checking the ranked pages. The default model runs on this Space.",
                 elem_classes="neo-hint",
             )
-            with gr.Row():
+            with gr.Row(elem_classes="neo-answer-controls"):
                 provider = gr.Dropdown(
-                    choices=list(PROVIDERS), value=LOCAL_PROVIDER, label="Provider", scale=1
+                    choices=list(PROVIDERS),
+                    value=LOCAL_PROVIDER,
+                    label="Provider",
+                    scale=1,
+                    min_width=170,
                 )
-                with gr.Column(scale=2):
-                    model = gr.Textbox(
-                        label="Model",
-                        value=PROVIDERS[LOCAL_PROVIDER].default_model,
-                        placeholder=PROVIDERS[LOCAL_PROVIDER].default_model,
-                        max_lines=1,
-                    )
-                    api_key = gr.Textbox(
-                        label="API key",
-                        type="password",
-                        placeholder=PROVIDERS[LOCAL_PROVIDER].key_hint,
-                        interactive=PROVIDERS[LOCAL_PROVIDER].needs_key,
-                    )
+                model = gr.Textbox(
+                    label="Model",
+                    value=PROVIDERS[LOCAL_PROVIDER].default_model,
+                    placeholder=PROVIDERS[LOCAL_PROVIDER].default_model,
+                    max_lines=1,
+                    scale=2,
+                    min_width=280,
+                )
+                api_key = gr.Textbox(
+                    label="API key",
+                    type="password",
+                    placeholder=PROVIDERS[LOCAL_PROVIDER].key_hint,
+                    interactive=PROVIDERS[LOCAL_PROVIDER].needs_key,
+                    scale=1,
+                    min_width=210,
+                )
             answer_btn = gr.Button(
                 "Generate answer from these pages", variant="primary", interactive=False
             )
