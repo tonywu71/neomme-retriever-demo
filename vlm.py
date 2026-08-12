@@ -35,11 +35,7 @@ class ProviderSpec(BaseModel):
     """False for the local model, which runs on the Space's own GPU and needs no credentials."""
 
 
-# Runs on the Space GPU, so the demo answers without a key. Fits ZeroGPU `large` (48GB) beside both NeoMME
-# sizes: 448.7M params x 2B (bf16) = 0.90GB of VLM weights. Its KV cache is small because only 6 of 16 layers
-# are full attention (the rest are short-conv): 2 x 6 x 8 kv-heads x 64 dims x 2B = 12KB/token, i.e. 0.1GB at
-# 8k tokens and 1.6GB at its full 128k context.
-LOCAL_MODEL_ID = os.environ.get("NEOMME_VLM_LOCAL", "LiquidAI/LFM2.5-VL-450M")
+LOCAL_MODEL_ID = os.environ.get("NEOMME_VLM_LOCAL", "LiquidAI/LFM2.5-VL-3B")
 LOCAL_PROVIDER = "Local VLM"
 _MAX_NEW_TOKENS = int(os.environ.get("NEOMME_VLM_MAX_NEW_TOKENS", "512"))
 
