@@ -9,7 +9,7 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 license: apache-2.0
-short_description: Visual retrieval with NeoMME 250M and 800M
+short_description: Visual retrieval with NeoMME 260M and 800M
 startup_duration_timeout: 1h
 ---
 
@@ -20,53 +20,34 @@ ranked highest.
 
 ## How it works
 
-Every PDF page is converted into an image, because NeoMME reads a page as pixels instead of as extracted text.
-The model encodes each page image into a grid of token vectors, a few pages per forward pass, and it scores your
-query against those grids with MaxSim. Scoring runs inside the app, so there is no separate index server.
+The app converts every PDF page to an image because NeoMME reads pixels, not extracted text. NeoMME turns each page
+into token vectors and compares the query with those vectors using MaxSim. The app runs that scoring itself, so it
+does not need a separate index server.
 
-Choose NeoMME 250M or 800M before indexing. The 250M model was trained for dense widths 128, 256, 512 and 1024.
-The 800M model adds the full 1792 width. Changing the model clears the index because embeddings from different
-checkpoints cannot be compared.
+Choose NeoMME 260M or 800M before indexing. Changing the model clears the index because vectors from different
+models cannot be compared.
 
-The same forward pass also produces one pooled vector per page, so the app indexes both representations and you
-can switch scoring under the collapsed retrieval settings. MaxSim is the default, and it is the only scoring the
-published retrieval numbers cover, so treat the dense option as a comparison rather than a supported mode.
+The app also stores one pooled vector for each page. You can switch to dense scoring in the retrieval settings, but
+MaxSim is the default and the only mode covered by the published retrieval results.
 
-Retrieval shows the ranked pages before doing anything else. The answer section can then ask a small vision
-language model on the Space to write an answer from those pages, with no API key. OpenAI, Anthropic and Gemini
-are also available. A visitor's key is used for that one request and is never stored.
+When you ask a question, the app retrieves the highest-ranked pages first. It then sends the question and those page
+images to a vision language model, which writes an answer using the retrieved pages as context. The Space includes a
+small local model, and you can also use OpenAI, Anthropic, or Gemini. The app uses a visitor's key for one request
+and does not store it.
 
-The app depends on `transformers` alone, through `NeoMMEForRetrieval` and `NeoMMEProcessor`. The research `neomme`
-package is deliberately not a dependency, so the app also shows that the published model works the way anyone
-outside the team would use it.
+The app uses `NeoMMEForRetrieval` and `NeoMMEProcessor` from `transformers`. It does not depend on the research
+`neomme` package.
 
-## Space settings
-
-These settings live on the Space rather than in git, so a rebuild from scratch does not restore them.
-
-| Setting | Value | Why |
-| --- | --- | --- |
-| Hardware | `zero-a10g` | the app is written for ZeroGPU, with `import spaces` before torch, `@spaces.GPU` on encode, score and generate, and the models placed on cuda at import |
-| Secret `HF_TOKEN` | a read token for the `Hcompany` org | both retrieval checkpoints are private |
-| Variable `NEOMME_RELEASE_250M` | `Hcompany/neomme-250M-retriever-transformers-v1.0` | optional override for the published 250M checkpoint |
-| Variable `NEOMME_RELEASE_800M` | `Hcompany/neomme-800M-retriever-transformers-v1.0` | optional override for the published 800M checkpoint |
-| Variable `NEOMME_MODEL_SIZE` | `250m` | which radio option is selected when the app opens |
-| Variable `GRADIO_SSR_MODE` | `false` | required for correct styling, because Gradio's server side rendering puts the app's CSS in the page before its own component stylesheets, which then override it. With rendering off, the CSS is applied last, as it is locally |
-
-Hardware cannot be set from this repo. The `hardware:` key in the front matter above is ignored, so use the
-Space settings page.
+<!-- Image placeholder: visual RAG flow from user question, to top-k retrieved page images, to the vision language model, to the answer. -->
 
 ## Deploying
 
-GitHub holds the source of truth. Every push to `main` runs `.github/workflows/sync-to-hub.yml`, which copies the
-repo to the Space, and you can also start it by hand from the Actions tab. Pushes that only touch `.github` are
-skipped, because the action never uploads that directory.
+GitHub holds the source of truth, not HuggingFace Hub. Every push to `main` runs `.github/workflows/sync-to-hub.yml`,
+which copies the repo to the Space, and you can also start it by hand from the Actions tab. Pushes that only touch
+`.github` are skipped because the action never uploads that directory.
 
 The workflow needs a GitHub Actions secret named `HF_TOKEN`, which is a write token for the `tonywu71` account.
 It is not the same token as the Space secret of the same name, which is a read token for the `Hcompany` org.
-
-A code change restarts the Space in about 40 seconds. A change to `requirements.txt` or to the front matter of
-this file triggers a full rebuild instead, which takes several minutes because `transformers` installs from git.
 
 To deploy without the workflow, for example while debugging:
 
@@ -75,7 +56,7 @@ hf upload tonywu71/neomme-retriever-demo . --repo-type space \
   --exclude "**/__pycache__/**" --exclude ".git/**" --exclude ".github/**"
 ```
 
-The copy only goes from GitHub to the Space, so anything you edit in the Space web UI is lost on the next deploy.
+The copy only goes from GitHub to the Hf Space, so anything you edit in the Space web UI is lost on the next deploy.
 
 ## Running locally
 
@@ -98,13 +79,14 @@ back to float32.
 
 If the answer model fails to load, the app still starts and offers only the providers that need a key.
 
-### Environment variables
+<details>
+<summary>Environment variables</summary>
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `NEOMME_RELEASE_250M` | `Hcompany/neomme-250M-retriever-transformers-v1.0` | any compatible 250M repo the port can load |
-| `NEOMME_RELEASE_800M` | `Hcompany/neomme-800M-retriever-transformers-v1.0` | any compatible 800M repo the port can load |
-| `NEOMME_MODEL_SIZE` | `250m` | default model-size selection, either `250m` or `800m` |
+| `NEOMME_RELEASE_260M` | `Hcompany/NeoMME-260M-Retriever` | any compatible 260M repo the port can load |
+| `NEOMME_RELEASE_800M` | `Hcompany/NeoMME-800M-Retriever` | any compatible 800M repo the port can load |
+| `NEOMME_MODEL_SIZE` | `260m` | default model-size selection, either `260m` or `800m` |
 | `NEOMME_VLM_LOCAL` | `LiquidAI/LFM2.5-VL-450M` | leave empty to disable local answers, which also removes the need for torchvision |
 | `NEOMME_VLM_MAX_NEW_TOKENS` | 512 | how long an answer can be, and the main control on how long generation takes |
 | `NEOMME_MAX_SIDE` | 2048 | the longest side a page image is resized to, trading quality for speed. 2048 is the cap used in the ViDoRe evaluation |
@@ -112,3 +94,24 @@ If the answer model fails to load, the app still starts and offers only the prov
 | `NEOMME_GPU_DURATION` | 120 | how many seconds of GPU time indexing asks ZeroGPU for |
 | `NEOMME_VLM_GPU_DURATION` | 60 | how many seconds of GPU time answering asks ZeroGPU for |
 | `PORT` | 7860 | the local server port. Gradio's own `GRADIO_SERVER_PORT` has no effect, because `app.py` passes the port explicitly |
+
+</details>
+
+<details>
+<summary>Space settings</summary>
+
+These settings live on the Space rather than in git, so a rebuild from scratch does not restore them.
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Hardware | `zero-a10g` | the app is written for ZeroGPU, with `import spaces` before torch, `@spaces.GPU` on encode, score and generate, and the models placed on cuda at import |
+| Secret `HF_TOKEN` | a read token for the `Hcompany` org | both retrieval checkpoints are private |
+| Variable `NEOMME_RELEASE_260M` | `Hcompany/NeoMME-260M-Retriever` | optional override for the published 260M checkpoint |
+| Variable `NEOMME_RELEASE_800M` | `Hcompany/NeoMME-800M-Retriever` | optional override for the published 800M checkpoint |
+| Variable `NEOMME_MODEL_SIZE` | `260m` | which radio option is selected when the app opens |
+| Variable `GRADIO_SSR_MODE` | `false` | required for correct styling, because Gradio's server side rendering puts the app's CSS in the page before its own component stylesheets, which then override it. With rendering off, the CSS is applied last, as it is locally |
+
+Hardware cannot be set from this repo. The `hardware:` key in the front matter above is ignored, so use the
+Space settings page.
+
+</details>

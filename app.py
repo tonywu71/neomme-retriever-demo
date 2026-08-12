@@ -15,7 +15,7 @@ ZeroGPU: the GPU-heavy work (encode + score) lives in @spaces.GPU functions, so 
 duration of those calls and released afterwards. The model is placed on cuda at import (ZeroGPU runs a CUDA
 emulation outside @spaces.GPU that permits this); off ZeroGPU it auto-selects mps/cpu and the decorator is a no-op.
 
-Env: NEOMME_RELEASE_250M / NEOMME_RELEASE_800M (HF repo ids), NEOMME_MODEL_SIZE (default selection),
+Env: NEOMME_RELEASE_260M / NEOMME_RELEASE_800M (HF repo ids), NEOMME_MODEL_SIZE (default selection),
 NEOMME_MAX_SIDE (px, default 2048 = the ViDoRe eval), NEOMME_PAGE_BATCH, NEOMME_GPU_DURATION.
 """
 
@@ -67,18 +67,18 @@ class Retriever:
 
 
 _RETRIEVER_SPECS = {
-    "250m": RetrieverSpec(
-        label="250M",
-        repo=os.environ.get("NEOMME_RELEASE_250M", "Hcompany/neomme-250M-retriever-transformers-v1.0"),
+    "260m": RetrieverSpec(
+        label="260M",
+        repo=os.environ.get("NEOMME_RELEASE_260M", "Hcompany/NeoMME-260M-Retriever"),
         dense_dims=(128, 256, 512, 1024),
     ),
     "800m": RetrieverSpec(
         label="800M",
-        repo=os.environ.get("NEOMME_RELEASE_800M", "Hcompany/neomme-800M-retriever-transformers-v1.0"),
+        repo=os.environ.get("NEOMME_RELEASE_800M", "Hcompany/NeoMME-800M-Retriever"),
         dense_dims=(128, 256, 512, 1024, 1792),
     ),
 }
-_DEFAULT_RETRIEVER = os.environ.get("NEOMME_MODEL_SIZE", "250m").lower()
+_DEFAULT_RETRIEVER = os.environ.get("NEOMME_MODEL_SIZE", "260m").lower()
 if _DEFAULT_RETRIEVER not in _RETRIEVER_SPECS:
     raise ValueError(f"NEOMME_MODEL_SIZE must be one of {sorted(_RETRIEVER_SPECS)}, got {_DEFAULT_RETRIEVER!r}")
 
@@ -106,10 +106,10 @@ _RETRIEVER_CHOICES = [(f"neomme-retriever-{spec.label}", key) for key, spec in _
 _RETRIEVER_LINKS = """
 <div class="neo-model-links">
   Model cards:
-  <a href="https://huggingface.co/Hcompany/neomme-250M-retriever-transformers-v1.0"
-     target="_blank" rel="noopener noreferrer">🤗 Hcompany/neomme-retriever-250M</a>
-  <a href="https://huggingface.co/Hcompany/neomme-800M-retriever-transformers-v1.0"
-     target="_blank" rel="noopener noreferrer">🤗 Hcompany/neomme-retriever-800M</a>
+  <a href="https://huggingface.co/Hcompany/NeoMME-260M-Retriever"
+     target="_blank" rel="noopener noreferrer">🤗 Hcompany/NeoMME-260M-Retriever</a>
+  <a href="https://huggingface.co/Hcompany/NeoMME-800M-Retriever"
+     target="_blank" rel="noopener noreferrer">🤗 Hcompany/NeoMME-800M-Retriever</a>
 </div>
 """
 
