@@ -1,6 +1,7 @@
 # Repository instructions
 
 - Use atomic conventional commits. Every commit pushed to `main` must leave the Space deployable because the sync workflow runs on each push.
+- Commit and push directly to `main`; this is a single-maintainer demo repo, no feature branches or PRs required.
 - Validate the YAML block at the top of `README.md` before committing:
   - `short_description` must contain at most 60 characters.
   - `emoji` must be one emoji.
