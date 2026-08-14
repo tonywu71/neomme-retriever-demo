@@ -79,13 +79,13 @@ def main() -> int:
         # Same shape as the app: one grid per page, trimmed to its real tokens.
         pages = processor(images=images)
         with torch.no_grad():
-            embeddings = model(**pages).multivector_embeddings
+            embeddings = model(**pages).embeddings
         lengths = pages["attention_mask"].sum(dim=-1).tolist()
         document_grids = [embeddings[row, :length] for row, length in enumerate(lengths)]
 
-        query = processor(text=["hello world"], text_role="query")
+        query = processor(text=["hello world"], task="query")
         with torch.no_grad():
-            query_embeddings = model(**query).multivector_embeddings
+            query_embeddings = model(**query).embeddings
 
         scores = processor.score_retrieval(query_embeddings, document_grids)[0].tolist()
         assert len(scores) == len(images), scores

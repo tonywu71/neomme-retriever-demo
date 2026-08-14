@@ -188,7 +188,7 @@ def _encode_documents(images: list[Image.Image], retriever: str) -> tuple[list[t
         batch = bundle.processor(images=images[start : start + _PAGE_BATCH], max_side=_MAX_SIDE).to(_DEVICE)
         with torch.no_grad():
             output = bundle.model(**batch)
-        embeddings = output.multivector_embeddings.float().cpu()
+        embeddings = output.embeddings.float().cpu()
         pooled.append(output.dense_embeddings.float().cpu())
         lengths = batch["attention_mask"].sum(dim=-1).tolist()
         grids.extend(embeddings[row, :length] for row, length in enumerate(lengths))
@@ -204,13 +204,13 @@ def _score(query: str, corpus: Corpus, scoring: str) -> list[float]:
     if corpus.retriever is None:
         raise ValueError("The corpus has no model size. Index the documents again.")
     bundle = _RETRIEVERS[corpus.retriever]
-    inputs = bundle.processor(text=[query], text_role="query").to(_DEVICE)
+    inputs = bundle.processor(text=[query], task="query").to(_DEVICE)
     with torch.no_grad():
         output = bundle.model(**inputs)
     if scoring == _DENSE:
         query_dense = output.dense_embeddings.float().cpu()
         return (query_dense @ corpus.dense_embeds.T)[0].tolist()
-    query_multivector = output.multivector_embeddings.float().cpu()
+    query_multivector = output.embeddings.float().cpu()
     return bundle.processor.score_retrieval(query_multivector, corpus.doc_embeds)[0].tolist()
 
 
