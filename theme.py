@@ -111,18 +111,10 @@ html, body { height: 100%; }
 .gradio-container h1 { font-size: 1.85rem; line-height: 1.1; }
 .gradio-container h2 { font-size: 1.15rem; }
 
-/* Compact hero: glyph + wordmark + subtitle on a single line, minimal vertical footprint. */
-.neo-hero-bar { display: flex; align-items: center; gap: 12px; margin: 2px 0 10px; }
-.neo-hero-bar h1 { margin: 0; }
-.neo-glyph { height: 1.9rem; width: auto; display: block; }
-.neo-subtitle {
-  font-family: var(--neo-mono, "JetBrains Mono", monospace);
-  font-size: 10.5px;
-  letter-spacing: 0.22em;
-  color: var(--neo-accent);
-  text-transform: uppercase;
-  font-weight: 500;
-}
+/* Hero: glyph + wordmark. */
+.neo-hero-bar { display: flex; align-items: center; gap: 24px; margin: 2px 0 10px; }
+.neo-hero-bar h1 { margin: 0; font-size: 2.25rem; }
+.neo-glyph { height: 3.8rem; width: auto; display: block; }
 
 /* The setup is a real two-step sequence. Settings stay available without competing with the task. */
 .neo-settings { margin: 4px 0 10px; }
@@ -211,8 +203,13 @@ html, body { height: 100%; }
 .neo-model-links a:hover { color: color-mix(in oklch, var(--neo-accent) 78%, var(--neo-ink)); }
 
 /* The introduction states the job once, then gets out of the way. */
-.neo-about { max-width: 72ch; margin: 0 0 4px; font-size: 0.98rem; line-height: 1.5; }
+.neo-intro { display: flex; align-items: center; justify-content: flex-start; gap: 20px; margin: 0 0 4px; }
+.neo-badges { display: flex; flex: 0 0 auto; flex-direction: column; gap: 8px; }
+.neo-badges a { display: block; line-height: 0; }
+.neo-badges img { height: 28px; width: auto; }
+.neo-about { flex: 0 1 58ch; max-width: 58ch; font-size: 0.98rem; line-height: 1.5; }
 .neo-about p { margin: 0; }
+.neo-emphasis { color: var(--neo-accent); }
 
 /* Natural heights survive new controls and narrow viewports without viewport-subtraction arithmetic. */
 .neo-upload { min-height: 220px; }
@@ -267,6 +264,8 @@ html, body { height: 100%; }
   .neo-examples button { flex-basis: 100%; }
   .neo-answer-controls { flex-direction: column; }
   .neo-model-links { flex-wrap: wrap; white-space: normal; }
+  .neo-intro { align-items: flex-start; flex-direction: column; }
+  .neo-badges { flex-direction: row; flex-wrap: wrap; }
 }
 
 footer { display: none !important; }

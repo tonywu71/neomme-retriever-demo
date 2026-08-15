@@ -35,7 +35,7 @@ class ProviderSpec(BaseModel):
     """False for the local model, which runs on the Space's own GPU and needs no credentials."""
 
 
-LOCAL_MODEL_ID = os.environ.get("NEOMME_VLM_LOCAL", "LiquidAI/LFM2.5-VL-3B")
+LOCAL_MODEL_ID = os.environ.get("NEOMME_VLM_LOCAL", "LiquidAI/LFM2.5-VL-450M")
 LOCAL_PROVIDER = "Local VLM"
 _MAX_NEW_TOKENS = int(os.environ.get("NEOMME_VLM_MAX_NEW_TOKENS", "512"))
 

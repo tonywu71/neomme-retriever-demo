@@ -1,5 +1,5 @@
 ---
-title: NeoMME Document Retrieval
+title: NeoMME-Retriever
 emoji: 📄
 colorFrom: indigo
 colorTo: gray
@@ -13,7 +13,7 @@ short_description: Visual retrieval with NeoMME 260M and 800M
 startup_duration_timeout: 1h
 ---
 
-# NeoMME retrieval demo
+# NeoMME-Retriever
 
 Upload PDFs or images, index them with NeoMME, then ask a question and read an answer taken from the pages that
 ranked highest.
@@ -87,7 +87,7 @@ If the answer model fails to load, the app still starts and offers only the prov
 | `NEOMME_RELEASE_260M` | `Hcompany/NeoMME-260M-Retriever` | any compatible 260M repo the port can load |
 | `NEOMME_RELEASE_800M` | `Hcompany/NeoMME-800M-Retriever` | any compatible 800M repo the port can load |
 | `NEOMME_MODEL_SIZE` | `260m` | default model-size selection, either `260m` or `800m` |
-| `NEOMME_VLM_LOCAL` | `LiquidAI/LFM2.5-VL-3B` | leave empty to disable local answers, which also removes the need for torchvision |
+| `NEOMME_VLM_LOCAL` | `LiquidAI/LFM2.5-VL-450M` | leave empty to disable local answers, which also removes the need for torchvision |
 | `NEOMME_VLM_MAX_NEW_TOKENS` | 512 | how long an answer can be, and the main control on how long generation takes |
 | `NEOMME_MAX_SIDE` | 2048 | the longest side a page image is resized to, trading quality for speed. 2048 is the cap used in the ViDoRe evaluation |
 | `NEOMME_PAGE_BATCH` | 4 | how many pages go through one forward pass, which bounds memory at full page resolution |

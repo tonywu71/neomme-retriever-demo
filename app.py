@@ -385,20 +385,38 @@ def _glyph_img() -> str:
 
 _HERO = f"""
 <div class="neo-hero-bar">
-  {_glyph_img()}<h1>NeoMME</h1><span class="neo-subtitle">document retrieval</span>
+  {_glyph_img()}<h1>NeoMME-Retriever</h1>
+</div>
+"""
+
+_BADGES = """
+<div class="neo-badges">
+  <a href="https://arxiv.org" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/arXiv-coming_soon-b31b1b.svg?style=for-the-badge" alt="arXiv: coming soon">
+  </a>
+  <a href="https://hf.co/collections/Hcompany/neomme" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/NeoMME_Collection-FFD21E?style=for-the-badge&amp;logo=huggingface&amp;logoColor=000" alt="NeoMME Collection on Hugging Face">
+  </a>
 </div>
 """
 
 _ABOUT = """
-Upload a document, ask a question, and inspect the ranked pages. NeoMME reads the *rendered* page directly,
-without an OCR step.
+<p>Upload PDFs or images, retrieve the pages that answer your query (<span class="neo-emphasis">retrieval</span>),
+then generate an answer from those pages using a VLM (<span class="neo-emphasis">visual RAG</span>).</p>
+"""
+
+_INTRO = f"""
+<div class="neo-intro">
+  {_BADGES}
+  <div class="neo-about">{_ABOUT}</div>
+</div>
 """
 
 
 def _demo():
-    with gr.Blocks(title="NeoMME document retrieval") as demo:  # theme/css passed at launch (Gradio 6)
+    with gr.Blocks(title="NeoMME-Retriever") as demo:  # theme/css passed at launch (Gradio 6)
         gr.HTML(_HERO)
-        gr.Markdown(_ABOUT, elem_classes="neo-about")
+        gr.HTML(_INTRO)
 
         with gr.Accordion("⚙️ Retrieval settings", open=False, elem_classes="neo-settings"):
             with gr.Row():
@@ -429,7 +447,7 @@ def _demo():
                     visible=os.path.isfile(_SAMPLE_PDF),
                 )
                 sample_btn = gr.Button(
-                    "Try the ColPali paper (10 pages)",
+                    "Example: add the ColPali paper 📄 (10 pages)",
                     size="sm",
                     variant="secondary",
                     visible=os.path.isfile(_SAMPLE_PDF),
@@ -439,11 +457,11 @@ def _demo():
                     "No documents indexed yet.", elem_classes="neo-status", elem_id="neo-index-status"
                 )
             with gr.Column(scale=3, min_width=340, elem_classes="neo-query-panel"):
-                gr.Markdown("## 2. Search the document", elem_classes="neo-step")
+                gr.Markdown("## 2. Search the corpus", elem_classes="neo-step")
                 query = gr.Textbox(
                     label="Query", placeholder="What does the report say about …?", lines=5, elem_classes="neo-query"
                 )
-                gr.Markdown("Questions for the sample paper:", elem_classes="neo-hint")
+                gr.Markdown("Examples queries about the ColPali paper:", elem_classes="neo-hint")
                 with gr.Row(elem_classes="neo-examples"):
                     for label, example in _EXAMPLE_QUERIES:
                         # default argument, or every button would close over the last loop value
