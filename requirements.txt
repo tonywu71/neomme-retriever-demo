@@ -12,9 +12,11 @@ pillow>=10.0
 openai>=1.0
 anthropic>=0.40
 google-genai>=1.0
+# MeanMaxSim late-interaction scoring (`mean_maxsim`/`cos_sim`), the scoring path the NeoMME model card documents.
+sentence-transformers>=6.0
 # The model runs on `transformers` alone — the research `neomme` package is NOT needed. NeoMME is not in a
 # transformers release yet, so install the port from source. Pin the source revision: Hugging Face's dependency
 # cache keys off this file and a moving branch can otherwise leave the Space on an incompatible implementation.
 # Swap this for a plain `transformers>=X` pin the day the PR lands upstream:
 # https://github.com/tonywu71/transformers/pull/2
-transformers @ git+https://github.com/tonywu71/transformers.git@3c1e8af1d0fc229cbf9885fae9babf5fa9dacbf6
+transformers @ git+https://github.com/tonywu71/transformers.git@c0f8594234be10908e3e588f7a8e784d8cfbee33

@@ -6,7 +6,8 @@ Runs on `transformers` alone: `NeoMMEForRetrieval` + `NeoMMEProcessor` from a co
 Flow: upload PDFs/images -> rasterize (pypdfium2 for PDFs) -> one forward per page batch, keeping both the
 per-page multivector grids and the per-page pooled dense vectors in memory. One forward produces both, so
 indexing both costs nothing extra. A query is then scored either with exact late-interaction MaxSim
-(`processor.score_retrieval`, per-token L2-normalized cosine — the objective the checkpoint was evaluated with)
+(`sentence_transformers.util.mean_maxsim`, per-token L2-normalized cosine — the objective the checkpoint was
+evaluated with)
 or with cosine on the pooled vectors, whichever the visitor picks; MaxSim is the default and the only scoring the
 published numbers cover. No external index server. The top pages are then sent, as images, to a user-selected VLM
 (OpenAI / Anthropic / Gemini) with the user's own API key to synthesize an answer.
@@ -30,7 +31,9 @@ import gradio as gr
 import spaces
 import torch
 from PIL import Image
+from sentence_transformers.util import mean_maxsim
 from theme import NEOMME_CSS, build_theme
+from torch.nn.utils.rnn import pad_sequence
 from transformers import NeoMMEForRetrieval, NeoMMEProcessor
 from vlm import LOCAL_PROVIDER, PROVIDERS, generate_answer
 
@@ -178,14 +181,16 @@ def _encode_documents(images: list[Image.Image], retriever: str) -> tuple[list[t
 
     Both come out of the same forward, so keeping both costs one extra vector per page.
 
-    The grids are trimmed to each page's real tokens: the head zeroes padding rows, but a ragged list is what
-    `score_retrieval` wants and it keeps a long page from padding every short one in the batch.
+    The grids are trimmed to each page's real tokens: the head zeroes padding rows, and a ragged list keeps a
+    long page from padding every short one across batches; scoring re-pads them behind a mask.
     """
     bundle = _RETRIEVERS[retriever]
     grids: list[torch.Tensor] = []
     pooled: list[torch.Tensor] = []
     for start in range(0, len(images), _PAGE_BATCH):
-        batch = bundle.processor(images=images[start : start + _PAGE_BATCH], max_side=_MAX_SIDE).to(_DEVICE)
+        batch = bundle.processor(
+            images=images[start : start + _PAGE_BATCH], max_side=_MAX_SIDE, padding="longest", return_tensors="pt"
+        ).to(_DEVICE)
         with torch.no_grad():
             output = bundle.model(**batch)
         embeddings = output.embeddings.float().cpu()
@@ -204,14 +209,21 @@ def _score(query: str, corpus: Corpus, scoring: str) -> list[float]:
     if corpus.retriever is None:
         raise ValueError("The corpus has no model size. Index the documents again.")
     bundle = _RETRIEVERS[corpus.retriever]
-    inputs = bundle.processor(text=[query], task="query").to(_DEVICE)
+    messages = [[{"role": "user", "content": query}]]
+    inputs = bundle.processor.apply_chat_template(
+        messages, task="query", tokenize=True, return_dict=True, return_tensors="pt"
+    ).to(_DEVICE)
     with torch.no_grad():
         output = bundle.model(**inputs)
     if scoring == _DENSE:
         query_dense = output.dense_embeddings.float().cpu()
         return (query_dense @ corpus.dense_embeds.T)[0].tolist()
-    query_multivector = output.embeddings.float().cpu()
-    return bundle.processor.score_retrieval(query_multivector, corpus.doc_embeds)[0].tolist()
+    query_grid = output.embeddings.float().cpu()
+    doc_grids = pad_sequence(corpus.doc_embeds, batch_first=True)
+    doc_mask = pad_sequence(
+        [torch.ones(grid.shape[0], dtype=torch.bool) for grid in corpus.doc_embeds], batch_first=True
+    )
+    return mean_maxsim(query_grid, doc_grids, a_mask=inputs["attention_mask"].cpu(), b_mask=doc_mask)[0].tolist()
 
 
 def _index(pages: list[tuple[str, Image.Image]], retriever: str) -> tuple[Corpus, str]:
