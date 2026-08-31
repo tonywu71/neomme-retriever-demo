@@ -172,7 +172,8 @@ def _answer_local(api_key: str, model: str, prompt: str, images: list[Image.Imag
     with torch.no_grad():
         generated = local_model.generate(**inputs, max_new_tokens=_MAX_NEW_TOKENS, do_sample=False)
     reply = generated[0, inputs["input_ids"].shape[-1] :]  # drop the prompt, keep the continuation
-    return local_processor.decode(reply, skip_special_tokens=True).strip()
+    # LFM2.5-VL-450M ships clean_up_tokenization_spaces=True; explicit False silences the BPE-cleanup warning
+    return local_processor.decode(reply, skip_special_tokens=True, clean_up_tokenization_spaces=False).strip()
 
 
 _DISPATCH = {
