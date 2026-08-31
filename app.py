@@ -125,9 +125,9 @@ _SAMPLE_PDF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples"
 # Queries that actually have an answer in the sample, so the demo shows a hit rather than a shrug. The short label
 # keeps the three buttons on one line; clicking one puts the full query in the box.
 _EXAMPLE_QUERIES = (
-    ("token pooling", "What is token pooling?"),
     ("ColPali arch.", "Describe the ColPali architecture."),
     ("speed vs RAG", "How fast is ColPali vs traditional text-based RAG?"),
+    ("token pooling", "What is token pooling?"),
 )
 
 # How a query is scored against the index. MaxSim is the default: it is what the checkpoint was trained and
