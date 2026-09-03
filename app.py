@@ -324,11 +324,14 @@ def _retrieve(query: str, top_k: int, scoring: str, corpus: Corpus) -> list[tupl
     return [(f"{corpus.pages[i][0]}  ({scores[i]:.3f})", corpus.pages[i][1]) for i in order]
 
 
-_BIBTEX = """@software{neomme2026,
-  author = {Lac, Aurélien and Wu, Tony},
-  title  = {{NeoMME}: a vision-tower-free masked-diffusion multimodal document retriever},
-  year   = {2026},
-  url    = {https://github.com/hcompai/neomme},
+_BIBTEX = """@misc{lac2026neommesingletowermultimodalnativemultilingual,
+      title={NeoMME: A Single-Tower Multimodal-Native Multilingual Foundation Encoder for Efficient Fine-Tuning and Inference},
+      author={Aurélien Lac and Tony Wu},
+      year={2026},
+      eprint={2609.01657},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2609.01657},
 }"""
 
 _NO_KEY_NOTE = (
