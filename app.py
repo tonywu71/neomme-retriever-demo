@@ -403,8 +403,8 @@ _HERO = f"""
 
 _BADGES = """
 <div class="neo-badges">
-  <a href="https://arxiv.org" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.shields.io/badge/arXiv-coming_soon-b31b1b.svg?style=for-the-badge" alt="arXiv: coming soon">
+  <a href="https://arxiv.org/abs/2609.01657" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/arXiv-2609.01657-b31b1b.svg?style=for-the-badge" alt="arXiv: 2609.01657">
   </a>
   <a href="https://hf.co/collections/Hcompany/neomme" target="_blank" rel="noopener noreferrer">
     <img src="https://img.shields.io/badge/NeoMME_Collection-FFD21E?style=for-the-badge&amp;logo=huggingface&amp;logoColor=000" alt="NeoMME Collection on Hugging Face">
