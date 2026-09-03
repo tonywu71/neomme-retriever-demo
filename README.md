@@ -1,6 +1,6 @@
 ---
-title: NeoMME-Retriever
-emoji: 📄
+title: NeoMME-Retriever - Demo
+emoji: 🔎
 colorFrom: indigo
 colorTo: gray
 sdk: gradio
@@ -9,7 +9,7 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 license: apache-2.0
-short_description: Visual retrieval with NeoMME 260M and 800M
+short_description: Visual document retrieval and RAG with NeoMME-Retriever
 startup_duration_timeout: 1h
 ---
 
