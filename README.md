@@ -15,6 +15,10 @@ startup_duration_timeout: 1h
 
 # NeoMME-Retriever
 
+[![Hugging Face](https://img.shields.io/badge/Model_doc-FFD21E?style=for-the-badge&logo=huggingface&logoColor=000)](https://huggingface.co/docs/transformers/en/model_doc/neomme)
+[![Hugging Face](https://img.shields.io/badge/Collection-FFD21E?style=for-the-badge&logo=huggingface&logoColor=000)](https://hf.co/collections/Hcompany/neomme)
+[![arXiv](https://img.shields.io/badge/arXiv-2609.01657-b31b1b.svg?style=for-the-badge)](https://arxiv.org/abs/2609.01657)
+
 Upload PDFs or images, index them with NeoMME, then ask a question and read an answer taken from the pages that
 ranked highest.
 
@@ -115,3 +119,17 @@ Hardware cannot be set from this repo. The `hardware:` key in the front matter a
 Space settings page.
 
 </details>
+
+## Citation
+
+```bibtex
+@misc{lac2026neommesingletowermultimodalnativemultilingual,
+      title={NeoMME: A Single-Tower Multimodal-Native Multilingual Foundation Encoder for Efficient Fine-Tuning and Inference},
+      author={Aurélien Lac and Tony Wu},
+      year={2026},
+      eprint={2609.01657},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2609.01657},
+}
+```
