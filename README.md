@@ -113,7 +113,6 @@ These settings live on the Space rather than in git, so a rebuild from scratch d
 | Variable `NEOMME_RELEASE_260M` | `Hcompany/NeoMME-260M-Retriever` | optional override for the published 260M checkpoint |
 | Variable `NEOMME_RELEASE_800M` | `Hcompany/NeoMME-800M-Retriever` | optional override for the published 800M checkpoint |
 | Variable `NEOMME_MODEL_SIZE` | `260m` | which radio option is selected when the app opens |
-| Variable `GRADIO_SSR_MODE` | `false` | required for correct styling, because Gradio's server side rendering puts the app's CSS in the page before its own component stylesheets, which then override it. With rendering off, the CSS is applied last, as it is locally |
 
 Hardware cannot be set from this repo. The `hardware:` key in the front matter above is ignored, so use the
 Space settings page.

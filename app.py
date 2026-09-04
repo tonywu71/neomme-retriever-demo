@@ -589,4 +589,5 @@ if __name__ == "__main__":
         server_port=int(os.environ.get("PORT", 7860)),
         theme=build_theme(),  # Gradio 6 takes theme/css on launch(), not on Blocks()
         css=NEOMME_CSS,
+        ssr_mode=False,  # SSR loads our CSS before Gradio's component styles, which then override it
     )
